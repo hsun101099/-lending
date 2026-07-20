@@ -1,7 +1,7 @@
 import { STAGE_CONFIG, STAGE_ORDER, stageProgress } from '../data/stages'
 import { getTodayIso } from './today'
 import { generateNextCaseId } from './caseId'
-import type { LoanCase } from '../types'
+import type { LoanCase, StageKey } from '../types'
 
 export interface NewCaseInput {
   customerName: string
@@ -10,12 +10,27 @@ export interface NewCaseInput {
   officer: string
   createdDate: string
   remarks: string
+  currentStage: StageKey
 }
 
 export function createCase(input: NewCaseInput, existing: LoanCase[]): LoanCase {
+  const currentIdx = STAGE_ORDER.indexOf(input.currentStage)
+  const isFullyDone = input.currentStage === 'disbursement'
+  const completedCount = isFullyDone ? STAGE_ORDER.length : currentIdx
+
   const timeline = STAGE_ORDER.map((key, i) => {
     const cfg = STAGE_CONFIG[key]
-    if (i === 0) {
+    if (i < completedCount) {
+      return {
+        key,
+        label: cfg.label,
+        status: 'completed' as const,
+        completedDate: input.createdDate,
+        officer: input.officer,
+        description: `${cfg.label}作業已完成，資料已歸檔存查。`,
+      }
+    }
+    if (i === currentIdx && !isFullyDone) {
       return {
         key,
         label: cfg.label,
@@ -39,9 +54,9 @@ export function createCase(input: NewCaseInput, existing: LoanCase[]): LoanCase 
     loanType: input.loanType,
     officer: input.officer,
     createdDate: input.createdDate,
-    currentStage: 'intake',
-    progress: stageProgress('intake'),
-    lastUpdated: input.createdDate,
+    currentStage: input.currentStage,
+    progress: stageProgress(input.currentStage),
+    lastUpdated: getTodayIso(),
     remarks: input.remarks,
     timeline,
   }

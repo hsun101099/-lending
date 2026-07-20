@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Banknote, Briefcase, CalendarDays, FilePlus2, User, X } from 'lucide-react'
+import { Banknote, Briefcase, CalendarDays, FilePlus2, ListChecks, User, X } from 'lucide-react'
 import { LOAN_TYPE_OPTIONS } from '../../data/loanTypes'
+import { STAGE_CONFIG, STAGE_ORDER } from '../../data/stages'
 import { getTodayIso } from '../../utils/today'
 import type { NewCaseInput } from '../../utils/caseActions'
+import type { StageKey } from '../../types'
 
 interface NewCaseModalProps {
   open: boolean
@@ -18,6 +20,7 @@ const emptyForm = {
   officer: '',
   createdDate: getTodayIso(),
   remarks: '',
+  currentStage: 'intake' as StageKey,
 }
 
 export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalProps) {
@@ -54,6 +57,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
       officer: form.officer.trim(),
       createdDate: form.createdDate,
       remarks: form.remarks.trim(),
+      currentStage: form.currentStage,
     })
     reset()
   }
@@ -92,7 +96,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-ink">新增案件</h2>
-                    <p className="text-xs text-ink-faint">登打客戶基本資料，案件將以「受理」狀態建立</p>
+                    <p className="text-xs text-ink-faint">登打客戶基本資料與目前辦理進度</p>
                   </div>
                 </div>
                 <button
@@ -177,6 +181,33 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                       onChange={(e) => setForm((f) => ({ ...f, createdDate: e.target.value }))}
                       className={inputClass(false)}
                     />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+                    <ListChecks size={12} /> 目前進度
+                  </label>
+                  <p className="mb-2 text-xs text-ink-faint">若案件已經在辦理中，可直接選擇目前所在的流程階段</p>
+                  <div className="flex flex-wrap gap-2">
+                    {STAGE_ORDER.map((stage) => {
+                      const cfg = STAGE_CONFIG[stage]
+                      const active = form.currentStage === stage
+                      return (
+                        <button
+                          key={stage}
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, currentStage: stage }))}
+                          className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                            active
+                              ? 'border-primary bg-primary text-white shadow-sm'
+                              : 'border-slate-200 bg-white text-ink-soft hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          {cfg.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
