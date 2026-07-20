@@ -1,9 +1,50 @@
-import { ANCHOR_DATE } from '../data/mockData'
 import { STAGE_CONFIG, STAGE_ORDER, stageProgress } from '../data/stages'
+import { getTodayIso } from './today'
+import { generateNextCaseId } from './caseId'
 import type { LoanCase } from '../types'
 
-function todayIso(): string {
-  return ANCHOR_DATE.toISOString().slice(0, 10)
+export interface NewCaseInput {
+  customerName: string
+  loanAmount: number
+  loanType: string
+  officer: string
+  createdDate: string
+  remarks: string
+}
+
+export function createCase(input: NewCaseInput, existing: LoanCase[]): LoanCase {
+  const timeline = STAGE_ORDER.map((key, i) => {
+    const cfg = STAGE_CONFIG[key]
+    if (i === 0) {
+      return {
+        key,
+        label: cfg.label,
+        status: 'current' as const,
+        officer: input.officer,
+        description: `${cfg.label}進行中，${input.officer}承辦處理。`,
+      }
+    }
+    return {
+      key,
+      label: cfg.label,
+      status: 'pending' as const,
+      description: `尚未進入${cfg.label}階段。`,
+    }
+  })
+
+  return {
+    id: generateNextCaseId(existing),
+    customerName: input.customerName,
+    loanAmount: input.loanAmount,
+    loanType: input.loanType,
+    officer: input.officer,
+    createdDate: input.createdDate,
+    currentStage: 'intake',
+    progress: stageProgress('intake'),
+    lastUpdated: input.createdDate,
+    remarks: input.remarks,
+    timeline,
+  }
 }
 
 export function advanceStage(loanCase: LoanCase): LoanCase {
@@ -11,7 +52,7 @@ export function advanceStage(loanCase: LoanCase): LoanCase {
 
   const idx = STAGE_ORDER.indexOf(loanCase.currentStage)
   const nextStage = STAGE_ORDER[idx + 1]
-  const today = todayIso()
+  const today = getTodayIso()
 
   const timeline = loanCase.timeline.map((step, i) => {
     if (i === idx) {
@@ -40,7 +81,7 @@ export function withdrawCase(loanCase: LoanCase): LoanCase {
   if (loanCase.currentStage === 'withdrawn' || loanCase.currentStage === 'disbursement') return loanCase
 
   const idx = STAGE_ORDER.indexOf(loanCase.currentStage)
-  const today = todayIso()
+  const today = getTodayIso()
 
   const timeline = [
     ...loanCase.timeline.slice(0, idx + 1).map((step, i) =>

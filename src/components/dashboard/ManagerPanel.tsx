@@ -5,7 +5,7 @@ import MonthlyVolumeChart from '../charts/MonthlyVolumeChart'
 import DailyCompletionChart from '../charts/DailyCompletionChart'
 import { getDailyCompletionSeries, getManagerMetrics, getMonthlyNewCaseSeries } from '../../utils/metrics'
 import { formatCurrencyCompact } from '../../utils/format'
-import { ANCHOR_DATE } from '../../data/mockData'
+import { getToday } from '../../utils/today'
 import type { LoanCase } from '../../types'
 
 interface ManagerPanelProps {
@@ -13,9 +13,10 @@ interface ManagerPanelProps {
 }
 
 export default function ManagerPanel({ cases }: ManagerPanelProps) {
-  const m = getManagerMetrics(cases, ANCHOR_DATE)
-  const monthlySeries = getMonthlyNewCaseSeries(cases, ANCHOR_DATE)
-  const dailySeries = getDailyCompletionSeries(cases, ANCHOR_DATE)
+  const today = getToday()
+  const m = getManagerMetrics(cases, today)
+  const monthlySeries = getMonthlyNewCaseSeries(cases, today)
+  const dailySeries = getDailyCompletionSeries(cases, today)
 
   const metrics = [
     { label: '今日新增案件', value: `${m.newToday} 件`, icon: FilePlus2, tint: 'primary' as const },

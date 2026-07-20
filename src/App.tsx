@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { CircleDollarSign, ListChecks, PackageOpen, Timer } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CircleDollarSign, FilePlus2, ListChecks, PackageOpen, Timer } from 'lucide-react'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
 import DashboardCard from './components/dashboard/DashboardCard'
@@ -7,24 +7,41 @@ import StageOverview from './components/dashboard/StageOverview'
 import ManagerPanel from './components/dashboard/ManagerPanel'
 import SearchBar from './components/table/SearchBar'
 import FilterTabs, { type FilterValue } from './components/table/FilterTabs'
-import LoanTable from './components/table/LoanTable'
+import LoanTable, { isOverdue } from './components/table/LoanTable'
 import CaseDrawer from './components/drawer/CaseDrawer'
-import { LOAN_CASES } from './data/mockData'
+import NewCaseModal from './components/forms/NewCaseModal'
 import { ALL_FILTER_STAGES } from './data/stages'
 import { getSummaryCounts } from './utils/metrics'
-import { advanceStage, withdrawCase } from './utils/caseActions'
+import { advanceStage, createCase, withdrawCase, type NewCaseInput } from './utils/caseActions'
 import type { LoanCase } from './types'
 
 export type ViewMode = 'dashboard' | 'manager'
 
+const STORAGE_KEY = 'loan-workflow-cases'
+
+function loadStoredCases(): LoanCase[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as LoanCase[]) : []
+  } catch {
+    return []
+  }
+}
+
 function App() {
   const [view, setView] = useState<ViewMode>('dashboard')
-  const [cases, setCases] = useState<LoanCase[]>(LOAN_CASES)
+  const [cases, setCases] = useState<LoanCase[]>(loadStoredCases)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterValue>('all')
+  const [isNewCaseOpen, setNewCaseOpen] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases))
+  }, [cases])
 
   const summary = useMemo(() => getSummaryCounts(cases), [cases])
+  const overdueCount = useMemo(() => cases.filter(isOverdue).length, [cases])
 
   const filteredCases = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -63,6 +80,11 @@ function App() {
     setCases((prev) => prev.map((c) => (c.id === id ? { ...c, remarks } : c)))
   }
 
+  function handleCreateCase(input: NewCaseInput) {
+    setCases((prev) => [createCase(input, prev), ...prev])
+    setNewCaseOpen(false)
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-app-bg text-ink">
       <Sidebar view={view} onChangeView={setView} />
@@ -71,6 +93,7 @@ function App() {
         <Header
           title="銀行放款流程管理系統"
           subtitle={view === 'dashboard' ? '案件總覽 Dashboard' : '主管報表 Manager Dashboard'}
+          overdueCount={overdueCount}
         />
 
         <div className="flex gap-2 border-b border-slate-200/70 bg-white px-4 py-2.5 sm:px-6 lg:hidden">
@@ -112,12 +135,26 @@ function App() {
                       顯示 {filteredCases.length} / {cases.length} 筆案件
                     </p>
                   </div>
-                  <SearchBar value={search} onChange={setSearch} />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <SearchBar value={search} onChange={setSearch} />
+                    <button
+                      onClick={() => setNewCaseOpen(true)}
+                      className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover"
+                    >
+                      <FilePlus2 size={16} />
+                      新增案件
+                    </button>
+                  </div>
                 </div>
                 <div className="mb-4">
                   <FilterTabs value={filter} onChange={setFilter} counts={filterCounts} />
                 </div>
-                <LoanTable cases={filteredCases} onSelect={(c) => setSelectedId(c.id)} />
+                <LoanTable
+                  cases={filteredCases}
+                  onSelect={(c) => setSelectedId(c.id)}
+                  hasAnyCases={cases.length > 0}
+                  onAddCase={() => setNewCaseOpen(true)}
+                />
               </div>
             </div>
           ) : (
@@ -135,6 +172,8 @@ function App() {
         onWithdraw={handleWithdraw}
         onUpdateRemarks={handleUpdateRemarks}
       />
+
+      <NewCaseModal open={isNewCaseOpen} onClose={() => setNewCaseOpen(false)} onCreate={handleCreateCase} />
     </div>
   )
 }

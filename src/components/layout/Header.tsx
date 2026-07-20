@@ -4,18 +4,25 @@ import { useState } from 'react'
 interface HeaderProps {
   title: string
   subtitle: string
+  overdueCount: number
 }
 
-const TODAY = new Date('2026-07-20T09:00:00')
-const TODAY_LABEL = TODAY.toLocaleDateString('zh-TW', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
-})
+function getTodayLabel(): string {
+  return new Date().toLocaleDateString('zh-TW', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  })
+}
 
-export default function Header({ title, subtitle }: HeaderProps) {
+export default function Header({ title, subtitle, overdueCount }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false)
+
+  const notifications =
+    overdueCount > 0
+      ? [{ text: `${overdueCount} 筆案件已逾期 7 天未更新，請優先處理`, time: '即時' }]
+      : []
 
   return (
     <header className="flex items-center justify-between border-b border-slate-200/70 bg-white/80 px-6 py-4 backdrop-blur-sm lg:px-8">
@@ -29,7 +36,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 rounded-full bg-slate-50 px-3.5 py-2 text-xs font-medium text-ink-soft md:flex">
           <CalendarDays size={14} className="text-ink-faint" />
-          {TODAY_LABEL}
+          {getTodayLabel()}
         </div>
 
         <div className="relative">
@@ -38,21 +45,23 @@ export default function Header({ title, subtitle }: HeaderProps) {
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-ink-soft transition-colors duration-200 hover:bg-slate-100 hover:text-ink"
           >
             <Bell size={17} />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-white" />
+            {overdueCount > 0 && (
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger ring-2 ring-white" />
+            )}
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-12 z-30 w-72 rounded-2xl border border-slate-100 bg-white p-2 shadow-card-hover">
               <p className="px-2.5 py-1.5 text-xs font-semibold text-ink-faint">通知</p>
-              {[
-                { text: '3 筆案件已逾期 7 天未更新', time: '10 分鐘前' },
-                { text: '劉冠廷案件已送主管批示', time: '1 小時前' },
-                { text: '今日已完成 5 筆撥款作業', time: '3 小時前' },
-              ].map((n) => (
-                <div key={n.text} className="rounded-xl px-2.5 py-2 text-sm hover:bg-slate-50">
-                  <p className="text-ink">{n.text}</p>
-                  <p className="mt-0.5 text-[11px] text-ink-faint">{n.time}</p>
-                </div>
-              ))}
+              {notifications.length === 0 ? (
+                <p className="px-2.5 py-4 text-center text-xs text-ink-faint">目前沒有新通知</p>
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.text} className="rounded-xl px-2.5 py-2 text-sm hover:bg-slate-50">
+                    <p className="text-ink">{n.text}</p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">{n.time}</p>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>

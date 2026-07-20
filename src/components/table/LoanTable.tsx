@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
-import { AlertTriangle, ChevronRight, Inbox } from 'lucide-react'
+import { AlertTriangle, ChevronRight, FilePlus2, Inbox } from 'lucide-react'
 import { STAGE_CONFIG } from '../../data/stages'
-import { ANCHOR_DATE } from '../../data/mockData'
+import { getToday } from '../../utils/today'
 import { daysSince, formatCurrency, formatDate } from '../../utils/format'
 import type { LoanCase } from '../../types'
 import StatusBadge from './StatusBadge'
@@ -10,26 +10,46 @@ import ProgressBar from './ProgressBar'
 interface LoanTableProps {
   cases: LoanCase[]
   onSelect: (loanCase: LoanCase) => void
+  hasAnyCases?: boolean
+  onAddCase?: () => void
 }
 
 const OVERDUE_THRESHOLD = 7
 
 export function isOverdue(loanCase: LoanCase): boolean {
   if (loanCase.currentStage === 'disbursement' || loanCase.currentStage === 'withdrawn') return false
-  return daysSince(loanCase.lastUpdated, ANCHOR_DATE) > OVERDUE_THRESHOLD
+  return daysSince(loanCase.lastUpdated, getToday()) > OVERDUE_THRESHOLD
 }
 
 const columns = ['客戶姓名', '貸款金額', '貸款種類', '承辦人', '建立日期', '目前流程', '案件狀態', '操作']
 
-export default function LoanTable({ cases, onSelect }: LoanTableProps) {
+export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCase }: LoanTableProps) {
   if (cases.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-card py-20 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 text-ink-faint">
           <Inbox size={22} />
         </div>
-        <p className="text-sm font-medium text-ink-soft">找不到符合條件的案件</p>
-        <p className="text-xs text-ink-faint">請調整搜尋關鍵字或篩選條件</p>
+        {hasAnyCases ? (
+          <>
+            <p className="text-sm font-medium text-ink-soft">找不到符合條件的案件</p>
+            <p className="text-xs text-ink-faint">請調整搜尋關鍵字或篩選條件</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-ink-soft">尚無任何案件</p>
+            <p className="text-xs text-ink-faint">點擊下方按鈕新增第一筆案件</p>
+            {onAddCase && (
+              <button
+                onClick={onAddCase}
+                className="mt-2 flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover"
+              >
+                <FilePlus2 size={16} />
+                新增案件
+              </button>
+            )}
+          </>
+        )}
       </div>
     )
   }
