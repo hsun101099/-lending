@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CircleDollarSign, FilePlus2, ListChecks, PackageOpen, Timer } from 'lucide-react'
+import { FilePlus2 } from 'lucide-react'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
-import DashboardCard from './components/dashboard/DashboardCard'
-import StageOverview from './components/dashboard/StageOverview'
 import ManagerPanel from './components/dashboard/ManagerPanel'
 import SearchBar from './components/table/SearchBar'
 import FilterTabs, { type FilterValue } from './components/table/FilterTabs'
@@ -12,7 +10,6 @@ import CaseDrawer from './components/drawer/CaseDrawer'
 import NewCaseModal from './components/forms/NewCaseModal'
 import ConfirmDialog from './components/common/ConfirmDialog'
 import { ALL_FILTER_STAGES } from './data/stages'
-import { getSummaryCounts } from './utils/metrics'
 import { advanceStage, createCase, withdrawCase, type NewCaseInput } from './utils/caseActions'
 import type { LoanCase } from './types'
 
@@ -42,7 +39,6 @@ function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cases))
   }, [cases])
 
-  const summary = useMemo(() => getSummaryCounts(cases), [cases])
   const overdueCount = useMemo(() => cases.filter(isOverdue).length, [cases])
 
   const filteredCases = useMemo(() => {
@@ -101,7 +97,7 @@ function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
           title="銀行放款流程管理系統"
-          subtitle={view === 'dashboard' ? '案件總覽 Dashboard' : '主管報表 Manager Dashboard'}
+          subtitle={view === 'dashboard' ? '案件列表與登打' : '主管報表 Manager Dashboard'}
           overdueCount={overdueCount}
         />
 
@@ -127,15 +123,6 @@ function App() {
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {view === 'dashboard' ? (
             <div className="mx-auto max-w-7xl space-y-8">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <DashboardCard label="目前案件" value={`${summary.total} 件`} icon={ListChecks} tint="primary" index={0} />
-                <DashboardCard label="處理中" value={`${summary.processing} 件`} icon={Timer} tint="warning" index={1} />
-                <DashboardCard label="已完成" value={`${summary.completed} 件`} icon={CircleDollarSign} tint="success" index={2} />
-                <DashboardCard label="撤件" value={`${summary.withdrawn} 件`} icon={PackageOpen} tint="danger" index={3} />
-              </div>
-
-              <StageOverview cases={cases} />
-
               <div>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>

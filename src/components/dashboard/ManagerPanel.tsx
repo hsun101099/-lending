@@ -1,12 +1,23 @@
 import { useMemo, useState } from 'react'
-import { AlertOctagon, CheckCircle2, Clock, FilePlus2, Timer, Wallet } from 'lucide-react'
+import {
+  AlertOctagon,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock,
+  FilePlus2,
+  ListChecks,
+  PackageOpen,
+  Timer,
+  Wallet,
+} from 'lucide-react'
 import DashboardCard from './DashboardCard'
+import StageOverview from './StageOverview'
 import StageDistributionChart from '../charts/StageDistributionChart'
 import MonthlyVolumeChart from '../charts/MonthlyVolumeChart'
 import DailyCompletionChart from '../charts/DailyCompletionChart'
 import LoanTable from '../table/LoanTable'
 import SearchBar from '../table/SearchBar'
-import { getDailyCompletionSeries, getManagerMetrics, getMonthlyNewCaseSeries } from '../../utils/metrics'
+import { getDailyCompletionSeries, getManagerMetrics, getMonthlyNewCaseSeries, getSummaryCounts } from '../../utils/metrics'
 import { formatCurrencyCompact } from '../../utils/format'
 import { getToday } from '../../utils/today'
 import type { LoanCase } from '../../types'
@@ -21,6 +32,7 @@ interface ManagerPanelProps {
 export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddCase }: ManagerPanelProps) {
   const [search, setSearch] = useState('')
   const today = getToday()
+  const summary = getSummaryCounts(cases)
   const m = getManagerMetrics(cases, today)
   const monthlySeries = getMonthlyNewCaseSeries(cases, today)
   const dailySeries = getDailyCompletionSeries(cases, today)
@@ -52,6 +64,15 @@ export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddC
         <h2 className="text-lg font-bold text-ink">主管報表</h2>
         <p className="mt-1 text-sm text-ink-faint">全行放款案件即時營運指標</p>
       </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardCard label="目前案件" value={`${summary.total} 件`} icon={ListChecks} tint="primary" index={0} />
+        <DashboardCard label="處理中" value={`${summary.processing} 件`} icon={Timer} tint="warning" index={1} />
+        <DashboardCard label="已完成" value={`${summary.completed} 件`} icon={CircleDollarSign} tint="success" index={2} />
+        <DashboardCard label="撤件" value={`${summary.withdrawn} 件`} icon={PackageOpen} tint="danger" index={3} />
+      </div>
+
+      <StageOverview cases={cases} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {metrics.map((metric, i) => (
