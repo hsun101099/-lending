@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, User, X, XCircle, ArrowUpCircle } from 'lucide-react'
+import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, User, X, XCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
 import type { LoanCase } from '../../types'
 import { formatCurrency, formatDate } from '../../utils/format'
 import StatusBadge from '../table/StatusBadge'
@@ -16,9 +16,17 @@ interface CaseDrawerProps {
   onAdvanceStage: (id: string) => void
   onWithdraw: (id: string) => void
   onUpdateRemarks: (id: string, remarks: string) => void
+  onDelete: (loanCase: LoanCase) => void
 }
 
-export default function CaseDrawer({ loanCase, onClose, onAdvanceStage, onWithdraw, onUpdateRemarks }: CaseDrawerProps) {
+export default function CaseDrawer({
+  loanCase,
+  onClose,
+  onAdvanceStage,
+  onWithdraw,
+  onUpdateRemarks,
+  onDelete,
+}: CaseDrawerProps) {
   const [remarksDraft, setRemarksDraft] = useState('')
 
   useEffect(() => {
@@ -74,12 +82,21 @@ export default function CaseDrawer({ loanCase, onClose, onAdvanceStage, onWithdr
                 <h2 className="text-xl font-bold text-ink">{loanCase.customerName}</h2>
                 <p className="mt-0.5 text-sm text-ink-faint">{loanCase.loanType} 貸款申請</p>
               </div>
-              <button
-                onClick={onClose}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => onDelete(loanCase)}
+                  title="刪除案件"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">

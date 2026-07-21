@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { AlertTriangle, ChevronRight, FilePlus2, Inbox } from 'lucide-react'
+import { AlertTriangle, ChevronRight, FilePlus2, Inbox, Trash2 } from 'lucide-react'
 import { STAGE_CONFIG } from '../../data/stages'
 import { getToday } from '../../utils/today'
 import { daysSince, formatCurrency, formatDate } from '../../utils/format'
@@ -12,6 +12,7 @@ interface LoanTableProps {
   onSelect: (loanCase: LoanCase) => void
   hasAnyCases?: boolean
   onAddCase?: () => void
+  onDelete?: (loanCase: LoanCase) => void
 }
 
 const OVERDUE_THRESHOLD = 7
@@ -23,7 +24,7 @@ export function isOverdue(loanCase: LoanCase): boolean {
 
 const columns = ['客戶姓名', '貸款金額', '貸款種類', '承辦人', '建立日期', '目前流程', '案件狀態', '操作']
 
-export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCase }: LoanTableProps) {
+export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCase, onDelete }: LoanTableProps) {
   if (cases.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-card py-20 text-center">
@@ -107,10 +108,24 @@ export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCa
                     <StatusBadge stage={loanCase.currentStage} className={overdue ? 'ring-2 ring-danger/30' : ''} />
                   </td>
                   <td className="px-5 py-3.5">
-                    <button className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors duration-150 group-hover:bg-blue-50">
-                      查看詳情
-                      <ChevronRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors duration-150 group-hover:bg-blue-50">
+                        查看詳情
+                        <ChevronRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />
+                      </button>
+                      {onDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete(loanCase)
+                          }}
+                          title="刪除案件"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </motion.tr>
               )

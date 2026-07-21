@@ -1,8 +1,11 @@
+import { useMemo, useState } from 'react'
 import { AlertOctagon, CheckCircle2, Clock, FilePlus2, Timer, Wallet } from 'lucide-react'
 import DashboardCard from './DashboardCard'
 import StageDistributionChart from '../charts/StageDistributionChart'
 import MonthlyVolumeChart from '../charts/MonthlyVolumeChart'
 import DailyCompletionChart from '../charts/DailyCompletionChart'
+import LoanTable from '../table/LoanTable'
+import SearchBar from '../table/SearchBar'
 import { getDailyCompletionSeries, getManagerMetrics, getMonthlyNewCaseSeries } from '../../utils/metrics'
 import { formatCurrencyCompact } from '../../utils/format'
 import { getToday } from '../../utils/today'
@@ -10,13 +13,29 @@ import type { LoanCase } from '../../types'
 
 interface ManagerPanelProps {
   cases: LoanCase[]
+  onSelectCase: (loanCase: LoanCase) => void
+  onDeleteCase: (loanCase: LoanCase) => void
+  onAddCase: () => void
 }
 
-export default function ManagerPanel({ cases }: ManagerPanelProps) {
+export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddCase }: ManagerPanelProps) {
+  const [search, setSearch] = useState('')
   const today = getToday()
   const m = getManagerMetrics(cases, today)
   const monthlySeries = getMonthlyNewCaseSeries(cases, today)
   const dailySeries = getDailyCompletionSeries(cases, today)
+
+  const filteredCases = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return cases
+    return cases.filter(
+      (c) =>
+        c.customerName.toLowerCase().includes(q) ||
+        c.officer.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q) ||
+        String(c.loanAmount).includes(q)
+    )
+  }, [cases, search])
 
   const metrics = [
     { label: '今日新增案件', value: `${m.newToday} 件`, icon: FilePlus2, tint: 'primary' as const },
@@ -46,6 +65,23 @@ export default function ManagerPanel({ cases }: ManagerPanelProps) {
         <div className="xl:col-span-2">
           <DailyCompletionChart data={dailySeries} />
         </div>
+      </div>
+
+      <div>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-ink">案件列表</h3>
+            <p className="mt-0.5 text-xs text-ink-faint">點擊案件可查看完整詳細資訊</p>
+          </div>
+          <SearchBar value={search} onChange={setSearch} />
+        </div>
+        <LoanTable
+          cases={filteredCases}
+          onSelect={onSelectCase}
+          hasAnyCases={cases.length > 0}
+          onDelete={onDeleteCase}
+          onAddCase={onAddCase}
+        />
       </div>
     </div>
   )

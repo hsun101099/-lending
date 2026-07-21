@@ -10,6 +10,7 @@ import FilterTabs, { type FilterValue } from './components/table/FilterTabs'
 import LoanTable, { isOverdue } from './components/table/LoanTable'
 import CaseDrawer from './components/drawer/CaseDrawer'
 import NewCaseModal from './components/forms/NewCaseModal'
+import ConfirmDialog from './components/common/ConfirmDialog'
 import { ALL_FILTER_STAGES } from './data/stages'
 import { getSummaryCounts } from './utils/metrics'
 import { advanceStage, createCase, withdrawCase, type NewCaseInput } from './utils/caseActions'
@@ -35,6 +36,7 @@ function App() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterValue>('all')
   const [isNewCaseOpen, setNewCaseOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<LoanCase | null>(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cases))
@@ -83,6 +85,13 @@ function App() {
   function handleCreateCase(input: NewCaseInput) {
     setCases((prev) => [createCase(input, prev), ...prev])
     setNewCaseOpen(false)
+  }
+
+  function handleConfirmDelete() {
+    if (!pendingDelete) return
+    setCases((prev) => prev.filter((c) => c.id !== pendingDelete.id))
+    if (selectedId === pendingDelete.id) setSelectedId(null)
+    setPendingDelete(null)
   }
 
   return (
@@ -154,12 +163,18 @@ function App() {
                   onSelect={(c) => setSelectedId(c.id)}
                   hasAnyCases={cases.length > 0}
                   onAddCase={() => setNewCaseOpen(true)}
+                  onDelete={setPendingDelete}
                 />
               </div>
             </div>
           ) : (
             <div className="mx-auto max-w-7xl">
-              <ManagerPanel cases={cases} />
+              <ManagerPanel
+                cases={cases}
+                onSelectCase={(c) => setSelectedId(c.id)}
+                onDeleteCase={setPendingDelete}
+                onAddCase={() => setNewCaseOpen(true)}
+              />
             </div>
           )}
         </main>
@@ -171,9 +186,22 @@ function App() {
         onAdvanceStage={handleAdvanceStage}
         onWithdraw={handleWithdraw}
         onUpdateRemarks={handleUpdateRemarks}
+        onDelete={setPendingDelete}
       />
 
       <NewCaseModal open={isNewCaseOpen} onClose={() => setNewCaseOpen(false)} onCreate={handleCreateCase} />
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="刪除案件"
+        message={
+          pendingDelete
+            ? `確定要刪除「${pendingDelete.customerName}」（${pendingDelete.id}）嗎？此操作無法復原。`
+            : ''
+        }
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }
