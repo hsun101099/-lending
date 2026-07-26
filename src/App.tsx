@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CloudUpload, FilePlus2, Loader2, X } from 'lucide-react'
+import { AlertTriangle, CloudUpload, FilePlus2, Loader2, X } from 'lucide-react'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
 import ManagerPanel from './components/dashboard/ManagerPanel'
@@ -48,6 +48,7 @@ function App() {
   const [pendingDelete, setPendingDelete] = useState<LoanCase | null>(null)
   const [legacyCases, setLegacyCases] = useState<LoanCase[]>([])
   const [importing, setImporting] = useState(false)
+  const [loadStalled, setLoadStalled] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -64,6 +65,16 @@ function App() {
       }
     )
   }, [user])
+
+  // Firestore 連不上時不會回報錯誤、只會無限重試，因此改由逾時提示使用者檢查設定。
+  useEffect(() => {
+    if (!casesLoading) {
+      setLoadStalled(false)
+      return
+    }
+    const timer = setTimeout(() => setLoadStalled(true), 8000)
+    return () => clearTimeout(timer)
+  }, [casesLoading])
 
   useEffect(() => {
     if (user) setLegacyCases(readLegacyCases())
@@ -233,10 +244,36 @@ function App() {
             )}
 
             {casesLoading ? (
-              <div className="flex items-center justify-center gap-2 py-24 text-sm text-ink-faint">
-                <Loader2 size={16} className="animate-spin" />
-                載入案件資料中...
-              </div>
+              loadStalled ? (
+                <div className="mx-auto max-w-lg rounded-2xl border border-amber-100 bg-amber-50/60 p-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning" />
+                    <div>
+                      <p className="text-sm font-bold text-ink">連不上雲端資料庫</p>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        登入已成功，但一直讀不到案件資料。最常見的原因是 Firebase 專案還沒有建立 Firestore 資料庫。
+                      </p>
+                      <p className="mt-3 text-xs font-semibold text-ink-soft">請確認：</p>
+                      <ul className="mt-1.5 space-y-1 text-xs text-ink-soft">
+                        <li>1. Firebase Console →「Firestore Database」→ 已按過「建立資料庫」</li>
+                        <li>2. 資料庫的「規則」頁籤已貼上專案的 firestore.rules 並發布</li>
+                        <li>3. 網路連線正常、未被公司防火牆阻擋</li>
+                      </ul>
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="mt-4 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition-colors duration-150 hover:bg-primary-hover"
+                      >
+                        重新載入
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 py-24 text-sm text-ink-faint">
+                  <Loader2 size={16} className="animate-spin" />
+                  載入案件資料中...
+                </div>
+              )
             ) : view === 'dashboard' ? (
               <div>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
