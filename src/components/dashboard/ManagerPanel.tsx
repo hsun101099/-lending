@@ -18,7 +18,7 @@ import DailyCompletionChart from '../charts/DailyCompletionChart'
 import LoanTable from '../table/LoanTable'
 import SearchBar from '../table/SearchBar'
 import { getDailyCompletionSeries, getManagerMetrics, getMonthlyNewCaseSeries, getSummaryCounts } from '../../utils/metrics'
-import { formatCurrencyCompact } from '../../utils/format'
+import { formatWan } from '../../utils/format'
 import { getToday } from '../../utils/today'
 import type { LoanCase } from '../../types'
 
@@ -52,7 +52,7 @@ export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddC
   const metrics = [
     { label: '今日新增案件', value: `${m.newToday} 件`, icon: FilePlus2, tint: 'primary' as const },
     { label: '今日完成案件', value: `${m.completedToday} 件`, icon: CheckCircle2, tint: 'success' as const },
-    { label: '今日撥款金額', value: formatCurrencyCompact(m.disbursedAmountToday), icon: Wallet, tint: 'success' as const },
+    { label: '今日撥款金額', value: formatWan(m.disbursedAmountToday), icon: Wallet, tint: 'success' as const },
     { label: '目前待批示案件', value: `${m.pendingApproval} 件`, icon: Clock, tint: 'warning' as const },
     { label: '目前卡件案件', value: `${m.stuckCases} 件`, icon: AlertOctagon, tint: 'danger' as const, helper: '超過 7 天未更新' },
     { label: '平均處理天數', value: `${m.avgProcessingDays} 天`, icon: Timer, tint: 'slate' as const },

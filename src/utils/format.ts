@@ -1,11 +1,20 @@
+const WAN = 10_000
+
 export function formatCurrency(amount: number): string {
   return `NT$ ${amount.toLocaleString('zh-TW')}`
 }
 
-export function formatCurrencyCompact(amount: number): string {
-  if (amount >= 100_000_000) return `${(amount / 100_000_000).toFixed(2)}億`
-  if (amount >= 10_000) return `${(amount / 10_000).toFixed(0)}萬`
-  return amount.toLocaleString('zh-TW')
+// Displays an NT$ amount in 萬 (ten-thousand) units, e.g. 5,000,000 -> "500萬"
+export function formatWan(amount: number): string {
+  return `${Math.round(amount / WAN).toLocaleString('zh-TW')}萬`
+}
+
+export function ntToWan(amountNt: number): number {
+  return amountNt / WAN
+}
+
+export function wanToNt(amountWan: number): number {
+  return Math.round(amountWan * WAN)
 }
 
 export function formatDate(iso: string): string {

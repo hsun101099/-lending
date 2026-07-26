@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, ChevronRight, FilePlus2, Inbox, Trash2 } from 'lucide-react'
 import { STAGE_CONFIG } from '../../data/stages'
 import { getToday } from '../../utils/today'
-import { daysSince, formatCurrency, formatDate } from '../../utils/format'
+import { daysSince, formatWan, formatDate } from '../../utils/format'
 import type { LoanCase } from '../../types'
 import StatusBadge from './StatusBadge'
 import ProgressBar from './ProgressBar'
@@ -97,7 +97,7 @@ export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCa
                     </div>
                     <p className="text-xs text-ink-faint">{loanCase.id}</p>
                   </td>
-                  <td className="px-5 py-3.5 font-medium text-ink tabular-nums">{formatCurrency(loanCase.loanAmount)}</td>
+                  <td className="px-5 py-3.5 font-medium text-ink tabular-nums">{formatWan(loanCase.loanAmount)}</td>
                   <td className="px-5 py-3.5 text-ink-soft">{loanCase.loanType}</td>
                   <td className="px-5 py-3.5 text-ink-soft">{loanCase.officer}</td>
                   <td className="px-5 py-3.5 text-ink-soft tabular-nums">{formatDate(loanCase.createdDate)}</td>
