@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CloudUpload, FilePlus2, Loader2, X } from 'lucide-react'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
-import ManagerPanel from './components/dashboard/ManagerPanel'
 import SearchBar from './components/table/SearchBar'
 import FilterTabs, { type FilterValue } from './components/table/FilterTabs'
 import LoanTable, { isOverdue } from './components/table/LoanTable'
@@ -17,6 +16,9 @@ import { isFirebaseConfigured } from './services/firebaseConfig'
 import { logout, useAuth } from './hooks/useAuth'
 import { createCase, importCases, removeCase, saveCase, subscribeToCases } from './services/caseRepository'
 import type { LoanCase } from './types'
+
+// 主管報表含多張圖表，體積較大且非進站首屏，改為切換到該頁時才載入。
+const ManagerPanel = lazy(() => import('./components/dashboard/ManagerPanel'))
 
 export type ViewMode = 'dashboard' | 'manager'
 
@@ -306,12 +308,21 @@ function App() {
                 />
               </div>
             ) : (
-              <ManagerPanel
-                cases={cases}
-                onSelectCase={(c) => setSelectedId(c.id)}
-                onDeleteCase={setPendingDelete}
-                onAddCase={() => setNewCaseOpen(true)}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center gap-2 py-24 text-sm text-ink-faint">
+                    <Loader2 size={16} className="animate-spin" />
+                    載入報表中...
+                  </div>
+                }
+              >
+                <ManagerPanel
+                  cases={cases}
+                  onSelectCase={(c) => setSelectedId(c.id)}
+                  onDeleteCase={setPendingDelete}
+                  onAddCase={() => setNewCaseOpen(true)}
+                />
+              </Suspense>
             )}
           </div>
         </main>

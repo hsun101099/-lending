@@ -1,6 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore'
 import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig'
 
 let app: FirebaseApp | null = null
@@ -21,6 +26,11 @@ export function getFirebaseAuth(): Auth {
 }
 
 export function getDb(): Firestore {
-  if (!dbInstance) dbInstance = getFirestore(ensureApp())
+  if (!dbInstance) {
+    // 開啟本機快取：再次開啟網頁時先以快取即時顯示，同時在背景與雲端同步。
+    dbInstance = initializeFirestore(ensureApp(), {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  }
   return dbInstance
 }
