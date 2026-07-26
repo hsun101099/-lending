@@ -8,7 +8,7 @@ import ProgressBar from '../table/ProgressBar'
 import Timeline from './Timeline'
 import { STAGE_CONFIG, STAGE_ORDER } from '../../data/stages'
 import { isOverdue } from '../table/LoanTable'
-import { REMARK_SUGGESTIONS } from '../../data/mockData'
+import { REMARK_SUGGESTIONS } from '../../data/remarkSuggestions'
 
 interface CaseDrawerProps {
   loanCase: LoanCase | null

@@ -1,10 +1,17 @@
-import { Bell, ChevronDown, CalendarDays } from 'lucide-react'
+import { Bell, CalendarDays, LogOut } from 'lucide-react'
 import { useState } from 'react'
 
 interface HeaderProps {
   title: string
   subtitle: string
   overdueCount: number
+  userEmail: string
+  onLogout: () => void
+}
+
+/** 沒有顯示名稱時，用信箱前半段當作稱呼，並取前兩碼做頭像。 */
+function displayNameFrom(email: string): string {
+  return email.split('@')[0] || '使用者'
 }
 
 function getTodayLabel(): string {
@@ -16,8 +23,9 @@ function getTodayLabel(): string {
   })
 }
 
-export default function Header({ title, subtitle, overdueCount }: HeaderProps) {
+export default function Header({ title, subtitle, overdueCount, userEmail, onLogout }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false)
+  const name = displayNameFrom(userEmail)
 
   const notifications =
     overdueCount > 0
@@ -66,16 +74,24 @@ export default function Header({ title, subtitle, overdueCount }: HeaderProps) {
           )}
         </div>
 
-        <button className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors duration-200 hover:bg-slate-50">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
-            WC
+        <div className="flex items-center gap-2 rounded-full py-1 pl-1 pr-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold uppercase text-white">
+            {name.slice(0, 2)}
           </div>
-          <div className="hidden text-left leading-tight md:block">
-            <p className="text-xs font-semibold text-ink">王經理</p>
-            <p className="text-[11px] text-ink-faint">授信部</p>
+          <div className="hidden max-w-[160px] text-left leading-tight md:block">
+            <p className="truncate text-xs font-semibold text-ink" title={userEmail}>
+              {name}
+            </p>
+            <p className="text-[11px] text-ink-faint">已登入</p>
           </div>
-          <ChevronDown size={14} className="hidden text-ink-faint md:block" />
-        </button>
+          <button
+            onClick={onLogout}
+            title="登出"
+            className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </div>
     </header>
   )

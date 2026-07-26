@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// 放款流程管理系統 Firestore 安全性規則
+//
+// 設定方式：Firebase Console → Firestore Database → 規則 → 貼上以下內容 → 發布
+//
+// 原則：只有透過 Authentication 登入的帳號才能讀寫案件資料，
+// 未登入者一律拒絕。帳號由管理者在 Firebase Console 建立，不開放自行註冊。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 案件資料：登入後皆可讀寫（所有同仁看得到全部案件）
+    match /cases/{caseId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 案件編號計數器：由系統交易配發，登入後才可存取
+    match /counters/{counterId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // 其他路徑一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

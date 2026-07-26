@@ -1,6 +1,5 @@
 import { STAGE_CONFIG, STAGE_ORDER, stageProgress } from '../data/stages'
 import { getTodayIso } from './today'
-import { generateNextCaseId } from './caseId'
 import type { LoanCase, StageKey } from '../types'
 
 export interface NewCaseInput {
@@ -13,7 +12,8 @@ export interface NewCaseInput {
   currentStage: StageKey
 }
 
-export function createCase(input: NewCaseInput, existing: LoanCase[]): LoanCase {
+/** 依登打內容組出一筆完整案件；案件編號由呼叫端（資料層）配發。 */
+export function buildCase(input: NewCaseInput, id: string): LoanCase {
   const currentIdx = STAGE_ORDER.indexOf(input.currentStage)
   const isFullyDone = input.currentStage === 'disbursement'
   const completedCount = isFullyDone ? STAGE_ORDER.length : currentIdx
@@ -48,7 +48,7 @@ export function createCase(input: NewCaseInput, existing: LoanCase[]): LoanCase 
   })
 
   return {
-    id: generateNextCaseId(existing),
+    id,
     customerName: input.customerName,
     loanAmount: input.loanAmount,
     loanType: input.loanType,
