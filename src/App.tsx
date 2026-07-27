@@ -10,6 +10,7 @@ import NewCaseModal from './components/forms/NewCaseModal'
 import ConfirmDialog from './components/common/ConfirmDialog'
 import SetupNotice from './components/common/SetupNotice'
 import LoginScreen from './components/auth/LoginScreen'
+import PrintReportModal from './components/report/PrintReportModal'
 import { ALL_FILTER_STAGES } from './data/stages'
 import { advanceStage, withdrawCase, type NewCaseInput } from './utils/caseActions'
 import { isFirebaseConfigured } from './services/firebaseConfig'
@@ -51,6 +52,7 @@ function App() {
   const [legacyCases, setLegacyCases] = useState<LoanCase[]>([])
   const [importing, setImporting] = useState(false)
   const [loadStalled, setLoadStalled] = useState(false)
+  const [isPrintOpen, setPrintOpen] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -175,7 +177,8 @@ function App() {
   if (!user) return <LoginScreen />
 
   return (
-    <div className="flex h-screen overflow-hidden bg-app-bg text-ink">
+    <>
+      <div className="print-hide flex h-screen overflow-hidden bg-app-bg text-ink">
       <Sidebar view={view} onChangeView={setView} />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -321,6 +324,7 @@ function App() {
                   onSelectCase={(c) => setSelectedId(c.id)}
                   onDeleteCase={setPendingDelete}
                   onAddCase={() => setNewCaseOpen(true)}
+                  onPrintReport={() => setPrintOpen(true)}
                 />
               </Suspense>
             )}
@@ -350,7 +354,10 @@ function App() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
-    </div>
+      </div>
+
+      <PrintReportModal open={isPrintOpen} cases={cases} onClose={() => setPrintOpen(false)} />
+    </>
   )
 }
 

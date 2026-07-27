@@ -70,3 +70,61 @@ body {
 .pulse-ring {
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ---------- 列印報表 ---------- */
+
+/* 螢幕上的預覽：模擬 A4 橫式紙張（297mm x 210mm）扣掉邊界後的內容寬度 */
+.print-sheet {
+  width: 273mm;
+  min-height: 186mm;
+  padding: 0;
+  background: #fff;
+}
+
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
+@media print {
+  /* 只留下報表內容，其餘介面全部不印 */
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-root {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+  }
+
+  /* 送印時交由 @page 控制紙張尺寸，不再套用預覽用的固定寬高 */
+  .print-sheet {
+    width: auto !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* 保留狀態顏色與底色，預設瀏覽器列印會將其省略 */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 表格跨頁時每頁重複標題列，且不將同一筆案件切成兩半 */
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .avoid-break {
+    break-inside: avoid;
+  }
+}

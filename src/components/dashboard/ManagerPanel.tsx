@@ -6,6 +6,7 @@ import {
   Clock,
   FilePlus2,
   ListChecks,
+  Printer,
   PackageOpen,
   Timer,
   Wallet,
@@ -27,9 +28,16 @@ interface ManagerPanelProps {
   onSelectCase: (loanCase: LoanCase) => void
   onDeleteCase: (loanCase: LoanCase) => void
   onAddCase: () => void
+  onPrintReport: () => void
 }
 
-export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddCase }: ManagerPanelProps) {
+export default function ManagerPanel({
+  cases,
+  onSelectCase,
+  onDeleteCase,
+  onAddCase,
+  onPrintReport,
+}: ManagerPanelProps) {
   const [search, setSearch] = useState('')
   const today = getToday()
   const summary = getSummaryCounts(cases)
@@ -60,9 +68,18 @@ export default function ManagerPanel({ cases, onSelectCase, onDeleteCase, onAddC
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-lg font-bold text-ink">主管報表</h2>
-        <p className="mt-1 text-sm text-ink-faint">全行放款案件即時營運指標</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-ink">主管報表</h2>
+          <p className="mt-1 text-sm text-ink-faint">全行放款案件即時營運指標</p>
+        </div>
+        <button
+          onClick={onPrintReport}
+          className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-soft shadow-sm transition-colors duration-150 hover:border-primary hover:text-primary"
+        >
+          <Printer size={16} />
+          列印報表
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
