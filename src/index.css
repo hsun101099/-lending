@@ -73,12 +73,19 @@ body {
 
 /* ---------- 列印報表 ---------- */
 
-/* 螢幕上的預覽：模擬 A4 橫式紙張（297mm x 210mm）扣掉邊界後的內容寬度 */
+/* 螢幕上的預覽：模擬 A4 橫式紙張（297mm x 210mm）扣掉 12mm 邊界後的可印範圍 */
+.print-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 6mm;
+}
+
 .print-sheet {
   width: 273mm;
-  min-height: 186mm;
-  padding: 0;
+  height: 186mm;
+  overflow: hidden; /* 內容超出時裁掉，避免擠出多餘空白頁 */
   background: #fff;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.12);
 }
 
 @page {
@@ -92,10 +99,7 @@ body {
     display: none !important;
   }
 
-  .print-only {
-    display: block !important;
-  }
-
+  /* 列印視窗的外框、篩選列、按鈕都不印，只留下報表本身 */
   .print-root {
     position: static !important;
     inset: auto !important;
@@ -105,11 +109,31 @@ body {
     padding: 0 !important;
   }
 
-  /* 送印時交由 @page 控制紙張尺寸，不再套用預覽用的固定寬高 */
-  .print-sheet {
-    width: auto !important;
-    min-height: 0 !important;
+  .print-shell,
+  .print-scroll {
+    max-height: none !important;
+    max-width: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
+  }
+
+  .print-doc {
+    display: block !important;
+    gap: 0 !important;
+  }
+
+  /* 每一頁對應一張實體紙張 */
+  .print-sheet {
+    box-shadow: none !important;
+    break-after: page;
+  }
+
+  .print-sheet:last-child {
+    break-after: auto;
   }
 
   /* 保留狀態顏色與底色，預設瀏覽器列印會將其省略 */
