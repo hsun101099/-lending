@@ -71,6 +71,16 @@ body {
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* 橫向捲動的選項列：隱藏捲軸，保留捲動功能 */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---------- 列印報表 ---------- */
 
 /* 螢幕上的預覽：模擬 A4 橫式紙張（297mm x 210mm）扣掉 12mm 邊界後的可印範圍 */

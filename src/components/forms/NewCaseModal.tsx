@@ -227,27 +227,43 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                   <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
                     <ListChecks size={12} /> 目前進度
                   </label>
-                  <p className="mb-2 text-xs text-ink-faint">若案件已經在辦理中，可直接選擇目前所在的流程階段</p>
-                  <div className="flex flex-wrap gap-2">
-                    {STAGE_ORDER.map((stage) => {
+                  <p className="mb-2.5 text-xs text-ink-faint">若案件已經在辦理中，可直接選擇目前所在的流程階段</p>
+                  {/* 流程有先後順序，以編號的等寬格狀排列呈現，比長短不一的膠囊按鈕好讀 */}
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {STAGE_ORDER.map((stage, i) => {
                       const cfg = STAGE_CONFIG[stage]
                       const active = form.currentStage === stage
+                      const passed = i < STAGE_ORDER.indexOf(form.currentStage)
                       return (
                         <button
                           key={stage}
                           type="button"
                           onClick={() => setForm((f) => ({ ...f, currentStage: stage }))}
-                          className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                          className={`flex items-center gap-1 rounded-xl border px-1.5 py-2 text-[11px] font-semibold transition-all duration-200 sm:gap-1.5 sm:px-2 sm:text-xs ${
                             active
                               ? 'border-primary bg-primary text-white shadow-sm'
-                              : 'border-slate-200 bg-white text-ink-soft hover:border-slate-300 hover:bg-slate-50'
+                              : passed
+                                ? 'border-blue-100 bg-blue-50/70 text-primary hover:border-blue-200'
+                                : 'border-slate-200 bg-white text-ink-soft hover:border-slate-300 hover:bg-slate-50'
                           }`}
                         >
-                          {cfg.label}
+                          <span
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none ${
+                              active ? 'bg-white/25 text-white' : passed ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-ink-faint'
+                            }`}
+                          >
+                            {i + 1}
+                          </span>
+                          <span className="truncate">{cfg.label}</span>
                         </button>
                       )
                     })}
                   </div>
+                  {STAGE_ORDER.indexOf(form.currentStage) > 0 && (
+                    <p className="mt-2 text-[11px] text-ink-faint">
+                      建立後，第 1～{STAGE_ORDER.indexOf(form.currentStage)} 關會自動標記為已完成
+                    </p>
+                  )}
                 </div>
 
                 <div>
