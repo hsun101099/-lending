@@ -10,8 +10,8 @@ import {
 import { getFirebaseAuth } from '../services/firebase'
 import { isFirebaseConfigured } from '../services/firebaseConfig'
 
-/** 密碼最少位數；Firebase 要求密碼至少 6 碼。 */
-export const MIN_PIN_LENGTH = 6
+/** 使用者需輸入的最少位數。 */
+export const MIN_PIN_LENGTH = 4
 
 /**
  * 系統以「一組數字」作為帳號密碼。
@@ -22,6 +22,14 @@ export const MIN_PIN_LENGTH = 6
  */
 function pinToInternalEmail(pin: string): string {
   return `u${pin}@loan.local`
+}
+
+/**
+ * Firebase 規定密碼至少 6 個字元，因此在內部補上固定前綴，
+ * 讓使用者只需要輸入 4 位數字。此前綴不會顯示給使用者。
+ */
+function pinToInternalPassword(pin: string): string {
+  return `loanpin-${pin}`
 }
 
 export interface AuthState {
@@ -76,11 +84,26 @@ export function describeAuthError(error: unknown, context: 'login' | 'register')
 }
 
 export async function loginWithPin(pin: string): Promise<void> {
-  await signInWithEmailAndPassword(getFirebaseAuth(), pinToInternalEmail(pin), pin)
+  const auth = getFirebaseAuth()
+  const email = pinToInternalEmail(pin)
+  try {
+    await signInWithEmailAndPassword(auth, email, pinToInternalPassword(pin))
+  } catch (error) {
+    // 早期版本直接以數字本身作為密碼，這裡讓當時建立的帳號仍可登入
+    const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
+    const isCredentialError =
+      code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found'
+    if (!isCredentialError || pin.length < 6) throw error
+    await signInWithEmailAndPassword(auth, email, pin)
+  }
 }
 
 export async function registerWithPin(name: string, pin: string): Promise<void> {
-  const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), pinToInternalEmail(pin), pin)
+  const credential = await createUserWithEmailAndPassword(
+    getFirebaseAuth(),
+    pinToInternalEmail(pin),
+    pinToInternalPassword(pin)
+  )
   await updateProfile(credential.user, { displayName: name })
 }
 
