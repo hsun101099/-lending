@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore'
 import { getDb } from './firebase'
 import { buildCase, type NewCaseInput } from '../utils/caseActions'
+import { normalizeCase } from '../utils/normalizeCase'
 import type { LoanCase } from '../types'
 
 const CASES = 'cases'
@@ -40,7 +41,9 @@ export function subscribeToCases(
   return onSnapshot(
     collection(getDb(), CASES),
     (snapshot) => {
-      const cases = snapshot.docs.map((d) => ({ ...(d.data() as Omit<LoanCase, 'id'>), id: d.id }))
+      const cases = snapshot.docs.map((d) =>
+        normalizeCase({ ...(d.data() as Omit<LoanCase, 'id'>), id: d.id })
+      )
       // 編號遞增，因此反向排序即為最新在前
       cases.sort((a, b) => b.id.localeCompare(a.id))
       onData(cases)

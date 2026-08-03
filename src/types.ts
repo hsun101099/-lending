@@ -3,7 +3,12 @@ export type StageKey =
   | 'appraisal'
   | 'credit'
   | 'approval'
+  | 'headOffice'
+  | 'creditReview'
   | 'contract'
+  | 'sealing'
+  | 'registration'
+  | 'finalApproval'
   | 'disbursement'
   | 'withdrawn'
 
@@ -36,6 +41,8 @@ export interface LoanCase {
   customerName: string
   loanAmount: number
   loanType: string
+  /** 案件類別：新貸／展期／動舊／追加。舊資料可能沒有此欄位 */
+  category?: string
   officer: string
   createdDate: string
   currentStage: StageKey

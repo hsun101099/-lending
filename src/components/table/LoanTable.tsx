@@ -22,7 +22,7 @@ export function isOverdue(loanCase: LoanCase): boolean {
   return daysSince(loanCase.lastUpdated, getToday()) > OVERDUE_THRESHOLD
 }
 
-const columns = ['客戶姓名', '貸款金額', '貸款種類', '承辦人', '建立日期', '目前流程', '案件狀態', '操作']
+const columns = ['客戶姓名', '貸款金額', '類別', '貸款種類', '承辦人', '建立日期', '目前流程', '案件狀態', '操作']
 
 export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCase, onDelete }: LoanTableProps) {
   if (cases.length === 0) {
@@ -58,7 +58,7 @@ export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCa
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-card shadow-card">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+        <table className="w-full min-w-[1060px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
               {columns.map((col) => (
@@ -98,6 +98,7 @@ export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCa
                     <p className="text-xs text-ink-faint">{loanCase.id}</p>
                   </td>
                   <td className="px-5 py-3.5 font-medium text-ink tabular-nums">{formatWan(loanCase.loanAmount)}</td>
+                  <td className="px-5 py-3.5 text-ink-soft">{loanCase.category || '—'}</td>
                   <td className="px-5 py-3.5 text-ink-soft">{loanCase.loanType}</td>
                   <td className="px-5 py-3.5 text-ink-soft">{loanCase.officer}</td>
                   <td className="px-5 py-3.5 text-ink-soft tabular-nums">{formatDate(loanCase.createdDate)}</td>

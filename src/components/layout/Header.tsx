@@ -5,13 +5,8 @@ interface HeaderProps {
   title: string
   subtitle: string
   overdueCount: number
-  userEmail: string
+  userName: string
   onLogout: () => void
-}
-
-/** 沒有顯示名稱時，用信箱前半段當作稱呼，並取前兩碼做頭像。 */
-function displayNameFrom(email: string): string {
-  return email.split('@')[0] || '使用者'
 }
 
 function getTodayLabel(): string {
@@ -23,9 +18,9 @@ function getTodayLabel(): string {
   })
 }
 
-export default function Header({ title, subtitle, overdueCount, userEmail, onLogout }: HeaderProps) {
+export default function Header({ title, subtitle, overdueCount, userName, onLogout }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false)
-  const name = displayNameFrom(userEmail)
+  const name = userName || '使用者'
 
   const notifications =
     overdueCount > 0
@@ -79,7 +74,7 @@ export default function Header({ title, subtitle, overdueCount, userEmail, onLog
             {name.slice(0, 2)}
           </div>
           <div className="hidden max-w-[160px] text-left leading-tight md:block">
-            <p className="truncate text-xs font-semibold text-ink" title={userEmail}>
+            <p className="truncate text-xs font-semibold text-ink" title={name}>
               {name}
             </p>
             <p className="text-[11px] text-ink-faint">已登入</p>

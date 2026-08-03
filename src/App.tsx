@@ -186,7 +186,7 @@ function App() {
           title="銀行放款流程管理系統"
           subtitle={view === 'dashboard' ? '案件列表與登打' : '主管報表 Manager Dashboard'}
           overdueCount={overdueCount}
-          userEmail={user.email ?? ''}
+          userName={user.displayName ?? ''}
           onLogout={() => logout()}
         />
 

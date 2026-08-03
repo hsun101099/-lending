@@ -6,6 +6,7 @@ export interface NewCaseInput {
   customerName: string
   loanAmount: number
   loanType: string
+  category: string
   officer: string
   createdDate: string
   remarks: string
@@ -52,6 +53,7 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
     customerName: input.customerName,
     loanAmount: input.loanAmount,
     loanType: input.loanType,
+    category: input.category,
     officer: input.officer,
     createdDate: input.createdDate,
     currentStage: input.currentStage,

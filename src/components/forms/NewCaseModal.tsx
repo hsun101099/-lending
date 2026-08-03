@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Banknote, Briefcase, CalendarDays, FilePlus2, ListChecks, User, X } from 'lucide-react'
+import { Banknote, Briefcase, CalendarDays, FilePlus2, ListChecks, Tags, User, X } from 'lucide-react'
 import { LOAN_TYPE_OPTIONS } from '../../data/loanTypes'
+import { CATEGORY_OPTIONS } from '../../data/categories'
 import { OFFICER_OPTIONS } from '../../data/officers'
 import { STAGE_CONFIG, STAGE_ORDER } from '../../data/stages'
 import { getTodayIso } from '../../utils/today'
@@ -21,6 +22,7 @@ const emptyForm = {
   customerName: '',
   loanAmountWan: '',
   loanType: '',
+  category: '',
   officer: '',
   createdDate: getTodayIso(),
   remarks: '',
@@ -36,6 +38,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
     customerName: form.customerName.trim() === '',
     loanAmountWan: !form.loanAmountWan || !(amountWan > 0),
     loanType: form.loanType.trim() === '',
+    category: form.category.trim() === '',
     officer: form.officer.trim() === '',
   }
   const isValid = !Object.values(errors).some(Boolean)
@@ -57,7 +60,8 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
     onCreate({
       customerName: form.customerName.trim(),
       loanAmount: wanToNt(amountWan),
-      loanType: form.loanType.trim(),
+      loanType: form.loanType,
+      category: form.category,
       officer: form.officer,
       createdDate: form.createdDate,
       remarks: form.remarks.trim(),
@@ -149,22 +153,41 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
 
                   <div>
                     <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
-                      <Briefcase size={12} /> 貸款種類
+                      <Tags size={12} /> 類別
                     </label>
-                    <input
-                      list="loan-type-options"
-                      value={form.loanType}
-                      onChange={(e) => setForm((f) => ({ ...f, loanType: e.target.value }))}
-                      placeholder="例如：房屋貸款"
-                      className={inputClass(errors.loanType)}
-                    />
-                    <datalist id="loan-type-options">
-                      {LOAN_TYPE_OPTIONS.map((t) => (
-                        <option key={t} value={t} />
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                      className={`${inputClass(errors.category)} ${form.category ? '' : 'text-ink-faint'}`}
+                    >
+                      <option value="">請選擇類別</option>
+                      {CATEGORY_OPTIONS.map((c) => (
+                        <option key={c} value={c} className="text-ink">
+                          {c}
+                        </option>
                       ))}
-                    </datalist>
-                    {touched && errors.loanType && <p className="mt-1 text-xs text-danger">請輸入貸款種類</p>}
+                    </select>
+                    {touched && errors.category && <p className="mt-1 text-xs text-danger">請選擇類別</p>}
                   </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+                    <Briefcase size={12} /> 貸款種類
+                  </label>
+                  <select
+                    value={form.loanType}
+                    onChange={(e) => setForm((f) => ({ ...f, loanType: e.target.value }))}
+                    className={`${inputClass(errors.loanType)} ${form.loanType ? '' : 'text-ink-faint'}`}
+                  >
+                    <option value="">請選擇貸款種類</option>
+                    {LOAN_TYPE_OPTIONS.map((t) => (
+                      <option key={t} value={t} className="text-ink">
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  {touched && errors.loanType && <p className="mt-1 text-xs text-danger">請選擇貸款種類</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

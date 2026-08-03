@@ -10,10 +10,10 @@ interface PrintableReportProps {
   filters: ReportFilters
 }
 
-const COLUMNS = ['案件編號', '客戶姓名', '貸款金額', '貸款種類', '承辦人', '建立日期', '目前流程', '進度', '備註']
+const COLUMNS = ['案件編號', '客戶姓名', '貸款金額', '類別', '貸款種類', '承辦人', '建立日期', '目前流程', '進度', '備註']
 
 /** 首頁需容納統計摘要，可放的明細列數較少。 */
-const FIRST_PAGE_ROWS = 13
+const FIRST_PAGE_ROWS = 12
 const OTHER_PAGE_ROWS = 20
 
 function paginate(cases: LoanCase[]): LoanCase[][] {
@@ -59,6 +59,7 @@ function DetailTable({ rows }: { rows: LoanCase[] }) {
               {isOverdue(c) && <span className="ml-1 font-bold text-[#dc2626]">⚠逾期</span>}
             </td>
             <td className={`${CELL} text-right whitespace-nowrap tabular-nums`}>{formatWan(c.loanAmount)}</td>
+            <td className={`${CELL} whitespace-nowrap`}>{c.category || '—'}</td>
             <td className={`${CELL} whitespace-nowrap`}>{c.loanType}</td>
             <td className={`${CELL} whitespace-nowrap`}>{c.officer}</td>
             <td className={`${CELL} whitespace-nowrap tabular-nums`}>{formatDate(c.createdDate)}</td>

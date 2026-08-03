@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, User, X, XCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
+import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, Tags, User, X, XCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
 import type { LoanCase } from '../../types'
 import { formatWan, formatDate } from '../../utils/format'
 import StatusBadge from '../table/StatusBadge'
@@ -44,6 +44,7 @@ export default function CaseDrawer({
     ? [
         { icon: Banknote, label: '貸款金額', value: formatWan(loanCase.loanAmount) },
         { icon: Briefcase, label: '貸款種類', value: loanCase.loanType },
+        { icon: Tags, label: '類別', value: loanCase.category || '—' },
         { icon: Hash, label: '案件編號', value: loanCase.id },
         { icon: User, label: '承辦人', value: loanCase.officer },
         { icon: CalendarDays, label: '建立日期', value: formatDate(loanCase.createdDate) },

@@ -1,12 +1,17 @@
 import type { StageConfig, StageKey } from '../types'
 
-// Ordered pipeline stages (withdrawn is a terminal side-exit, not part of the main flow)
+// 依實際承作流程排序；撤件為中途終止的出口，不屬於主流程
 export const STAGE_ORDER: StageKey[] = [
   'intake',
   'appraisal',
   'credit',
   'approval',
+  'headOffice',
+  'creditReview',
   'contract',
+  'sealing',
+  'registration',
+  'finalApproval',
   'disbursement',
 ]
 
@@ -43,13 +48,33 @@ export const STAGE_CONFIG: Record<StageKey, StageConfig> = {
   },
   approval: {
     key: 'approval',
-    label: '批示',
-    shortLabel: '批示',
+    label: '單位批示',
+    shortLabel: '單位批示',
     color: '#9333EA',
     bg: 'bg-purple-50',
     text: 'text-purple-600',
     border: 'border-purple-200',
     dot: 'bg-purple-500',
+  },
+  headOffice: {
+    key: 'headOffice',
+    label: '總社批示',
+    shortLabel: '總社批示',
+    color: '#7C3AED',
+    bg: 'bg-violet-50',
+    text: 'text-violet-600',
+    border: 'border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  creditReview: {
+    key: 'creditReview',
+    label: '授管室書審',
+    shortLabel: '授管室書審',
+    color: '#DB2777',
+    bg: 'bg-pink-50',
+    text: 'text-pink-600',
+    border: 'border-pink-200',
+    dot: 'bg-pink-500',
   },
   contract: {
     key: 'contract',
@@ -60,6 +85,36 @@ export const STAGE_CONFIG: Record<StageKey, StageConfig> = {
     text: 'text-teal-600',
     border: 'border-teal-200',
     dot: 'bg-teal-500',
+  },
+  sealing: {
+    key: 'sealing',
+    label: '用印',
+    shortLabel: '用印',
+    color: '#0891B2',
+    bg: 'bg-cyan-50',
+    text: 'text-cyan-600',
+    border: 'border-cyan-200',
+    dot: 'bg-cyan-500',
+  },
+  registration: {
+    key: 'registration',
+    label: '設定',
+    shortLabel: '設定',
+    color: '#0284C7',
+    bg: 'bg-sky-50',
+    text: 'text-sky-600',
+    border: 'border-sky-200',
+    dot: 'bg-sky-500',
+  },
+  finalApproval: {
+    key: 'finalApproval',
+    label: '核定',
+    shortLabel: '核定',
+    color: '#65A30D',
+    bg: 'bg-lime-50',
+    text: 'text-lime-700',
+    border: 'border-lime-200',
+    dot: 'bg-lime-500',
   },
   disbursement: {
     key: 'disbursement',
@@ -89,4 +144,8 @@ export function stageProgress(stage: StageKey): number {
   if (stage === 'withdrawn') return 0
   const idx = STAGE_ORDER.indexOf(stage)
   return Math.round(((idx + 1) / STAGE_ORDER.length) * 100)
+}
+
+export function isStageKey(value: unknown): value is StageKey {
+  return typeof value === 'string' && value in STAGE_CONFIG
 }
