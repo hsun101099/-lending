@@ -229,33 +229,45 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                   </label>
                   <p className="mb-2.5 text-xs text-ink-faint">若案件已經在辦理中，可直接選擇目前所在的流程階段</p>
                   {/* 流程有先後順序，以編號的等寬格狀排列呈現，比長短不一的膠囊按鈕好讀 */}
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
                     {STAGE_ORDER.map((stage, i) => {
                       const cfg = STAGE_CONFIG[stage]
                       const active = form.currentStage === stage
                       const passed = i < STAGE_ORDER.indexOf(form.currentStage)
                       return (
-                        <button
+                        <motion.button
                           key={stage}
                           type="button"
                           onClick={() => setForm((f) => ({ ...f, currentStage: stage }))}
-                          className={`flex items-center gap-1 rounded-xl border px-1.5 py-2 text-[11px] font-semibold transition-all duration-200 sm:gap-1.5 sm:px-2 sm:text-xs ${
-                            active
-                              ? 'border-primary bg-primary text-white shadow-sm'
-                              : passed
-                                ? 'border-blue-100 bg-blue-50/70 text-primary hover:border-blue-200'
-                                : 'border-slate-200 bg-white text-ink-soft hover:border-slate-300 hover:bg-slate-50'
+                          whileTap={{ scale: 0.96 }}
+                          className={`relative flex items-center gap-1 rounded-xl px-1.5 py-2 text-[11px] font-semibold transition-colors duration-200 sm:gap-1.5 sm:px-2 sm:text-xs ${
+                            active ? 'text-white' : passed ? 'text-primary' : 'text-ink-soft hover:text-ink'
                           }`}
                         >
+                          {/* 選取色塊在階段之間滑動，讓流程前進的感覺更明確 */}
+                          {active ? (
+                            <motion.span
+                              layoutId="stage-active-tile"
+                              transition={{ type: 'spring', stiffness: 400, damping: 34 }}
+                              className="absolute inset-0 rounded-xl bg-primary shadow-[0_2px_10px_-2px_rgba(37,99,235,0.55)]"
+                            />
+                          ) : (
+                            <span
+                              className={`absolute inset-0 rounded-xl transition-colors duration-200 ${
+                                passed ? 'bg-blue-50' : 'bg-slate-50 hover:bg-slate-100'
+                              }`}
+                            />
+                          )}
+
                           <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold tabular-nums leading-none ${
-                              active ? 'bg-white/25 text-white' : passed ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-ink-faint'
+                            className={`relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold leading-none tabular-nums ${
+                              active ? 'bg-white/25 text-white' : passed ? 'bg-primary/15 text-primary' : 'bg-white text-ink-faint'
                             }`}
                           >
                             {i + 1}
                           </span>
-                          <span className="truncate">{cfg.label}</span>
-                        </button>
+                          <span className="relative z-10 truncate">{cfg.label}</span>
+                        </motion.button>
                       )
                     })}
                   </div>
