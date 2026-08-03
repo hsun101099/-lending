@@ -23,28 +23,42 @@ export async function downloadReportPdf(container: HTMLElement, fileName = build
     import('jspdf'),
   ])
 
-  const pageElements = Array.from(container.querySelectorAll<HTMLElement>('[data-report-page]'))
-  if (pageElements.length === 0) throw new Error('找不到可輸出的報表內容')
+  // 畫面上的預覽會等比縮小以配合視窗寬度，該縮放會讓擷取結果變形，
+  // 因此在畫面外以原始尺寸複製一份版面，輸出一律以 A4 實際大小為準。
+  const sandbox = document.createElement('div')
+  sandbox.setAttribute('aria-hidden', 'true')
+  sandbox.style.cssText = 'position:absolute;top:0;left:-100000px;z-index:-1;background:#fff;'
+  const clone = container.cloneNode(true) as HTMLElement
+  clone.style.transform = 'none'
+  sandbox.appendChild(clone)
+  document.body.appendChild(sandbox)
 
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const contentWidth = A4_LANDSCAPE_WIDTH_MM - MARGIN_MM * 2
-  const contentHeight = A4_LANDSCAPE_HEIGHT_MM - MARGIN_MM * 2
+  try {
+    const pageElements = Array.from(clone.querySelectorAll<HTMLElement>('[data-report-page]'))
+    if (pageElements.length === 0) throw new Error('找不到可輸出的報表內容')
 
-  for (let i = 0; i < pageElements.length; i++) {
-    const canvas = await html2canvas(pageElements[i], {
-      scale: 2, // 提高解析度，列印時文字才不會糊
-      backgroundColor: '#ffffff',
-      logging: false,
-    })
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const contentWidth = A4_LANDSCAPE_WIDTH_MM - MARGIN_MM * 2
+    const contentHeight = A4_LANDSCAPE_HEIGHT_MM - MARGIN_MM * 2
 
-    // 等比縮放以完整置入版面範圍，避免內容被裁切
-    const ratio = Math.min(contentWidth / canvas.width, contentHeight / canvas.height)
-    const drawWidth = canvas.width * ratio
-    const drawHeight = canvas.height * ratio
+    for (let i = 0; i < pageElements.length; i++) {
+      const canvas = await html2canvas(pageElements[i], {
+        scale: 2, // 提高解析度，列印時文字才不會糊
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
 
-    if (i > 0) pdf.addPage()
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, drawWidth, drawHeight)
+      // 等比縮放以完整置入版面範圍，避免內容被裁切
+      const ratio = Math.min(contentWidth / canvas.width, contentHeight / canvas.height)
+      const drawWidth = canvas.width * ratio
+      const drawHeight = canvas.height * ratio
+
+      if (i > 0) pdf.addPage()
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', MARGIN_MM, MARGIN_MM, drawWidth, drawHeight)
+    }
+
+    pdf.save(fileName)
+  } finally {
+    document.body.removeChild(sandbox)
   }
-
-  pdf.save(fileName)
 }

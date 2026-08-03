@@ -136,6 +136,15 @@ body {
     gap: 0 !important;
   }
 
+  /* 畫面上為配合視窗寬度而縮小的預覽，送印時必須還原為 A4 原尺寸 */
+  .report-frame,
+  .report-scaler {
+    height: auto !important;
+    width: auto !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
   /* 每一頁對應一張實體紙張 */
   .print-sheet {
     box-shadow: none !important;
