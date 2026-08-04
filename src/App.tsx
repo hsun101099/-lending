@@ -11,7 +11,8 @@ import ConfirmDialog from './components/common/ConfirmDialog'
 import UndoToast from './components/common/UndoToast'
 import SetupNotice from './components/common/SetupNotice'
 import LoginScreen from './components/auth/LoginScreen'
-import PasswordModal from './components/auth/PasswordModal'
+import JoinScreen from './components/auth/JoinScreen'
+import AccountModal from './components/auth/AccountModal'
 import PrintReportModal from './components/report/PrintReportModal'
 import DeletedCasesPanel from './components/trash/DeletedCasesPanel'
 import { ALL_FILTER_STAGES } from './data/stages'
@@ -19,6 +20,7 @@ import { advanceStage, withdrawCase, type NewCaseInput } from './utils/caseActio
 import { partitionCases } from './utils/recycleBin'
 import { isFirebaseConfigured } from './services/firebaseConfig'
 import { logout, useAuth } from './hooks/useAuth'
+import { checkMembership, type MembershipStatus } from './services/membership'
 import {
   createCase,
   importCases,
@@ -73,10 +75,28 @@ function App() {
   const [importing, setImporting] = useState(false)
   const [loadStalled, setLoadStalled] = useState(false)
   const [isPrintOpen, setPrintOpen] = useState(false)
-  const [isPasswordOpen, setPasswordOpen] = useState(false)
+  const [isAccountOpen, setAccountOpen] = useState(false)
+  const [membership, setMembership] = useState<MembershipStatus | null>(null)
+
+  // 先確認這個帳號在單位名冊裡，才開始讀案件資料
+  useEffect(() => {
+    if (!user) {
+      setMembership(null)
+      return
+    }
+    let cancelled = false
+    checkMembership(user.uid).then((status) => {
+      if (!cancelled) setMembership(status)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  const joined = membership === 'member' || membership === 'rulesNotReady'
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !joined) return
     setCasesLoading(true)
     return subscribeToCases(
       (next) => {
@@ -89,7 +109,7 @@ function App() {
         setCasesLoading(false)
       }
     )
-  }, [user])
+  }, [user, joined])
 
   // Firestore 連不上時不會回報錯誤、只會無限重試，因此改由逾時提示使用者檢查設定。
   useEffect(() => {
@@ -217,6 +237,18 @@ function App() {
 
   if (!user) return <LoginScreen />
 
+  if (membership === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app-bg">
+        <Loader2 size={22} className="animate-spin text-ink-faint" />
+      </div>
+    )
+  }
+
+  if (membership === 'needsCode') {
+    return <JoinScreen user={user} onJoined={() => setMembership('member')} />
+  }
+
   return (
     <>
       <div className="print-hide flex h-screen overflow-hidden bg-app-bg text-ink">
@@ -235,7 +267,7 @@ function App() {
           overdueCount={overdueCount}
           userName={user.displayName ?? ''}
           onLogout={() => logout()}
-          onChangePassword={() => setPasswordOpen(true)}
+          onChangePassword={() => setAccountOpen(true)}
         />
 
         <div className="flex gap-2 border-b border-slate-200/70 bg-white px-4 py-2.5 sm:px-6 lg:hidden">
@@ -424,7 +456,7 @@ function App() {
         onCancel={() => setPendingPurge(null)}
       />
 
-      <PasswordModal open={isPasswordOpen} onClose={() => setPasswordOpen(false)} />
+      <AccountModal open={isAccountOpen} onClose={() => setAccountOpen(false)} />
 
       <UndoToast
         open={!!justDeleted}

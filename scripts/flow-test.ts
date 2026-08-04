@@ -281,7 +281,7 @@ console.log('=== 8. 員編登入 ===')
   check(validateEmployeeId('a b@c') !== '', '含特殊符號不通過')
 }
 
-console.log('=== 9. 選填密碼 ===')
+console.log('=== 9. 密碼 ===')
 {
   // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
   check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))
@@ -291,10 +291,13 @@ console.log('=== 9. 選填密碼 ===')
   check(resolveSecret('A1234', 'Bank2026') !== resolveSecret('A1234', 'bank2026'), '密碼區分大小寫')
   check(resolveSecret('A1234', ' pw12 ') === 'pw12', '密碼去除前後空白')
 
-  check(validatePassword('') === '', '密碼可以不設定')
-  check(validatePassword('   ') === '', '只打空白視為不設定')
+  check(validatePassword('') === '', '登入時密碼可留空（相容舊帳號）')
+  check(validatePassword('   ') === '', '只打空白視為留空')
+  check(validatePassword('', true) !== '', '建立帳號時一定要設密碼')
+  check(validatePassword('   ', true) !== '', '建立帳號時只打空白不算數')
   check(validatePassword('abc') !== '', '密碼太短不通過')
   check(validatePassword('abcd') === '', '四個字的密碼通過', validatePassword('abcd'))
+  check(validatePassword('abcd', true) === '', '建立帳號時四個字的密碼通過')
   check(validatePassword('銀行密碼') === '', '中文密碼可用', validatePassword('銀行密碼'))
 
   check(getEmployeeId({ email: 'ua1234@loan.local' } as never) === 'a1234', '可從帳號取回員編')

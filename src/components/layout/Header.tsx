@@ -90,8 +90,8 @@ export default function Header({
           </div>
           <button
             onClick={onChangePassword}
-            title="設定密碼"
-            aria-label="設定密碼"
+            title="帳號與安全"
+            aria-label="帳號與安全"
             className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
           >
             <KeyRound size={16} />

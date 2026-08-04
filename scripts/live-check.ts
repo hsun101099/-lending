@@ -76,6 +76,40 @@ async function main() {
     return
   }
 
+  // 發布新版安全性規則後，沒有加入名冊就讀不到案件。
+  // 執行前可用 REG_CODE=你的註冊碼 npx tsx scripts/live-check.ts 帶入註冊碼。
+  // 註：此腳本用自己的 Firestore 連線，因此不共用前端的 membership 模組
+  const uid = auth.currentUser!.uid
+  const status = await getDoc(doc(db, 'members', uid))
+    .then((snap) => (snap.exists() ? 'member' : 'needsCode'))
+    .catch(() => 'rulesNotReady')
+  if (status === 'needsCode') {
+    const code = process.env.REG_CODE ?? ''
+    if (!code) {
+      console.log('\n⚠️  安全性規則已生效，但沒有提供註冊碼，無法繼續測試案件相關功能。')
+      console.log('   請改用：REG_CODE=你的單位註冊碼 npx tsx scripts/live-check.ts\n')
+      if (auth.currentUser) await deleteUser(auth.currentUser).catch(() => {})
+      return
+    }
+    try {
+      await setDoc(doc(db, 'members', uid), {
+        code,
+        name: '測試員',
+        employeeId: TEST_EMPLOYEE_ID,
+        joinedAt: new Date().toISOString(),
+      })
+      ok('以單位註冊碼加入名冊')
+    } catch (e) {
+      no('以單位註冊碼加入名冊（註冊碼可能不正確）', e)
+      if (auth.currentUser) await deleteUser(auth.currentUser).catch(() => {})
+      return
+    }
+  } else if (status === 'member') {
+    ok('已在單位名冊中')
+  } else {
+    console.log('  ·  新版安全性規則尚未發布，暫時比照舊版驗證')
+  }
+
   console.log('\n=== 2. 新增案件並寫入 Firestore ===')
   let c = buildCase(
     {
@@ -276,7 +310,10 @@ async function main() {
   ok('確認測試案件皆已刪除')
 
   try {
-    if (auth.currentUser) await deleteUser(auth.currentUser)
+    if (auth.currentUser) {
+      await deleteDoc(doc(db, 'members', auth.currentUser.uid)).catch(() => {})
+      await deleteUser(auth.currentUser)
+    }
     ok('刪除測試帳號')
   } catch (e) {
     no('刪除測試帳號', e)

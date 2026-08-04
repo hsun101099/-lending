@@ -1,29 +1,68 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { KeyRound, Loader2, X } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck, X } from 'lucide-react'
 import { changePassword, describeAuthError, MIN_PASSWORD_LENGTH, validatePassword } from '../../hooks/useAuth'
+import { describeMembershipError, getRegistrationCode, updateRegistrationCode } from '../../services/membership'
+import { MIN_CODE_LENGTH } from './JoinScreen'
 
-interface PasswordModalProps {
+interface AccountModalProps {
   open: boolean
   onClose: () => void
 }
 
-/** 讓已登入的同仁自行設定、更改或取消密碼。 */
-export default function PasswordModal({ open, onClose }: PasswordModalProps) {
+type Tab = 'password' | 'code'
+
+/** 讓已登入的同仁自行設定密碼，以及查看、更改單位註冊碼。 */
+export default function AccountModal({ open, onClose }: AccountModalProps) {
+  const [tab, setTab] = useState<Tab>('password')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [code, setCode] = useState('')
+  const [codeVisible, setCodeVisible] = useState(false)
+  const [codeLoading, setCodeLoading] = useState(false)
+  const [codeError, setCodeError] = useState('')
+  const [codeDone, setCodeDone] = useState('')
+
   useEffect(() => {
     if (!open) return
+    setTab('password')
     setPassword('')
     setConfirm('')
     setError('')
     setDone('')
     setSaving(false)
+    setCode('')
+    setCodeVisible(false)
+    setCodeError('')
+    setCodeDone('')
+    setCodeLoading(true)
+    getRegistrationCode()
+      .then((value) => setCode(value))
+      .catch(() => setCodeError('讀不到目前的註冊碼，可能是安全性規則尚未發布'))
+      .finally(() => setCodeLoading(false))
   }, [open])
+
+  async function saveCode() {
+    if (code.trim().length < MIN_CODE_LENGTH) {
+      setCodeError(`註冊碼至少 ${MIN_CODE_LENGTH} 個字`)
+      return
+    }
+    setCodeError('')
+    setCodeDone('')
+    setCodeLoading(true)
+    try {
+      await updateRegistrationCode(code)
+      setCodeDone('註冊碼已更新，請記得轉達給同仁')
+    } catch (err) {
+      setCodeError(describeMembershipError(err, 'setup'))
+    } finally {
+      setCodeLoading(false)
+    }
+  }
 
   async function save(next: string, successText: string) {
     setError('')
@@ -81,8 +120,12 @@ export default function PasswordModal({ open, onClose }: PasswordModalProps) {
             >
               <div className="mb-4 flex items-start justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-ink">設定密碼</h3>
-                  <p className="mt-1 text-xs text-ink-soft">設定後，登入時要同時輸入員編與密碼。</p>
+                  <h3 className="text-sm font-bold text-ink">帳號與安全</h3>
+                  <p className="mt-1 text-xs text-ink-soft">
+                    {tab === 'password'
+                      ? '設定後，登入時要同時輸入員編與密碼。'
+                      : '新同仁建立帳號時要輸入這組碼，沒有就看不到案件資料。'}
+                  </p>
                 </div>
                 <button
                   onClick={onClose}
@@ -93,7 +136,77 @@ export default function PasswordModal({ open, onClose }: PasswordModalProps) {
                 </button>
               </div>
 
-              {done ? (
+              <div className="mb-5 flex gap-1 rounded-xl bg-slate-100 p-1">
+                {([
+                  { key: 'password' as Tab, label: '登入密碼' },
+                  { key: 'code' as Tab, label: '單位註冊碼' },
+                ]).map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTab(t.key)}
+                    className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors duration-200 ${
+                      tab === t.key ? 'bg-white text-primary shadow-sm' : 'text-ink-soft hover:text-ink'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {tab === 'code' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-ink-soft">目前的單位註冊碼</label>
+                    <div className="relative">
+                      <ShieldCheck
+                        size={15}
+                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
+                      />
+                      <input
+                        type={codeVisible ? 'text' : 'password'}
+                        value={code}
+                        onChange={(e) => {
+                          setCode(e.target.value)
+                          setCodeDone('')
+                        }}
+                        placeholder={codeLoading ? '讀取中...' : '尚未設定'}
+                        autoComplete="off"
+                        spellCheck={false}
+                        className={`${inputClass} pr-11`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCodeVisible((v) => !v)}
+                        aria-label={codeVisible ? '隱藏註冊碼' : '顯示註冊碼'}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint transition-colors hover:text-ink"
+                      >
+                        {codeVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+                      改掉之後，舊的註冊碼就不能再用來建立新帳號；已經在使用的同仁不受影響。
+                    </p>
+                  </div>
+
+                  {codeError && (
+                    <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{codeError}</p>
+                  )}
+                  {codeDone && (
+                    <p className="rounded-xl bg-green-50 px-3 py-2 text-xs font-medium text-success">{codeDone}</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={saveCode}
+                    disabled={codeLoading}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-ink-faint"
+                  >
+                    {codeLoading && <Loader2 size={15} className="animate-spin" />}
+                    {codeLoading ? '處理中...' : '儲存註冊碼'}
+                  </button>
+                </div>
+              ) : done ? (
                 <>
                   <p className="rounded-xl bg-green-50 px-3 py-2.5 text-xs font-medium text-success">{done}</p>
                   <button

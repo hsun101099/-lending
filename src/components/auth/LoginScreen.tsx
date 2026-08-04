@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { IdCard, KeyRound, Landmark, Loader2, User } from 'lucide-react'
+import { IdCard, KeyRound, Landmark, Loader2, ShieldCheck, User } from 'lucide-react'
 import {
   describeAuthError,
+  discardCurrentAccount,
+  getEmployeeId,
   loginWithEmployeeId,
   MIN_EMPLOYEE_ID_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -10,8 +12,17 @@ import {
   validateEmployeeId,
   validatePassword,
 } from '../../hooks/useAuth'
+import {
+  checkMembership,
+  describeMembershipError,
+  joinWithCode,
+} from '../../services/membership'
+import { MIN_CODE_LENGTH } from './JoinScreen'
 
 type Mode = 'login' | 'register'
+
+/** 已經整理成中文說明的錯誤，直接顯示即可。 */
+class JoinError extends Error {}
 
 export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login')
@@ -19,6 +30,7 @@ export default function LoginScreen() {
   const [employeeId, setEmployeeId] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -29,6 +41,28 @@ export default function LoginScreen() {
     setName('')
     setPassword('')
     setPasswordConfirm('')
+    setCode('')
+  }
+
+  /**
+   * 建立帳號後立刻用註冊碼把自己加入名冊。
+   * 註冊碼不對就把剛建立的帳號收回，不讓外人留下可用的帳號。
+   */
+  async function registerAndJoin() {
+    const user = await registerWithEmployeeId(name.trim(), employeeId, password)
+    try {
+      await joinWithCode({
+        uid: user.uid,
+        code,
+        name: name.trim(),
+        employeeId: getEmployeeId(user),
+      })
+    } catch (err) {
+      // 新版安全性規則尚未發布時，名冊本來就寫不進去，這種情況照舊放行
+      if ((await checkMembership(user.uid)) === 'rulesNotReady') return
+      await discardCurrentAccount().catch(() => {})
+      throw new JoinError(describeMembershipError(err, 'join'))
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,13 +78,17 @@ export default function LoginScreen() {
         setError('請輸入姓名')
         return
       }
-      const pwError = validatePassword(password)
+      const pwError = validatePassword(password, true)
       if (pwError) {
         setError(pwError)
         return
       }
-      if (password.trim() && password !== passwordConfirm) {
+      if (password !== passwordConfirm) {
         setError('兩次輸入的密碼不一致')
+        return
+      }
+      if (code.trim().length < MIN_CODE_LENGTH) {
+        setError('請輸入單位註冊碼，若不知道請向同仁索取')
         return
       }
     }
@@ -61,10 +99,10 @@ export default function LoginScreen() {
       if (mode === 'login') {
         await loginWithEmployeeId(employeeId, password)
       } else {
-        await registerWithEmployeeId(name.trim(), employeeId, password)
+        await registerAndJoin()
       }
     } catch (err) {
-      setError(describeAuthError(err, mode))
+      setError(err instanceof JoinError ? err.message : describeAuthError(err, mode))
       setSubmitting(false)
     }
   }
@@ -86,7 +124,7 @@ export default function LoginScreen() {
           </div>
           <h1 className="text-lg font-bold text-ink">銀行放款流程管理系統</h1>
           <p className="mt-1 text-xs text-ink-faint">
-            {mode === 'login' ? '請輸入你的員編' : '填寫姓名與員編即可開始使用，密碼可自行選擇是否設定'}
+            {mode === 'login' ? '請輸入你的員編與密碼' : '需要單位註冊碼才能建立帳號'}
           </p>
         </div>
 
@@ -143,7 +181,10 @@ export default function LoginScreen() {
 
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
-              密碼<span className="font-normal text-ink-faint">（選填）</span>
+              密碼
+              {mode === 'register' && (
+                <span className="font-normal text-ink-faint">（至少 {MIN_PASSWORD_LENGTH} 個字）</span>
+              )}
             </label>
             <div className="relative">
               <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
@@ -151,35 +192,62 @@ export default function LoginScreen() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'login' ? '沒設定密碼請留空' : `不想設定就留空（至少 ${MIN_PASSWORD_LENGTH} 個字）`}
+                placeholder={mode === 'login' ? '沒設定密碼請留空' : '請設定密碼'}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 className={inputClass}
               />
             </div>
           </div>
 
-          {mode === 'register' && password.trim() !== '' && (
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-ink-soft">再次輸入密碼</label>
-              <div className="relative">
-                <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  type="password"
-                  value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  placeholder="再輸入一次"
-                  autoComplete="new-password"
-                  className={inputClass}
-                />
+          {mode === 'register' && (
+            <>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-ink-soft">再次輸入密碼</label>
+                <div className="relative">
+                  <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+                  <input
+                    type="password"
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    placeholder="再輸入一次"
+                    autoComplete="new-password"
+                    className={inputClass}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-ink-soft">單位註冊碼</label>
+                <div className="relative">
+                  <ShieldCheck
+                    size={15}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
+                  />
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="請向單位內的同仁索取"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={inputClass}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+                  沒有註冊碼就看不到任何案件資料，用來防止外人自行註冊。
+                </p>
+              </div>
+            </>
           )}
 
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{error}</p>}
 
           <button
             type="submit"
-            disabled={submitting || !employeeId || (mode === 'register' && !name)}
+            disabled={
+              submitting ||
+              !employeeId ||
+              (mode === 'register' && (!name || !password || !passwordConfirm || !code))
+            }
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-ink-faint"
           >
             {submitting && <Loader2 size={15} className="animate-spin" />}
@@ -190,7 +258,7 @@ export default function LoginScreen() {
         <p className="mt-5 text-center text-[11px] leading-relaxed text-ink-faint">
           {mode === 'login'
             ? '第一次使用請點上方「建立帳號」；先前用數字登入的同仁，員編填原本那組數字、密碼留空即可'
-            : '不設定密碼的話，之後只要輸入員編就能登入；登入後隨時可以在右上角補設密碼'}
+            : '密碼請自行牢記，忘記將無法自行取回'}
         </p>
       </motion.div>
     </div>

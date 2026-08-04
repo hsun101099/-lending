@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -92,10 +93,15 @@ export function validateEmployeeId(raw: string): string {
   return ''
 }
 
-/** 密碼是選填的：留空代表只用員編登入。 */
-export function validatePassword(password: string): string {
+/**
+ * 檢查密碼。
+ *
+ * 建立新帳號時一定要設密碼；登入時則允許留空，
+ * 因為先前建立的帳號本來就沒有密碼，不能把他們鎖在門外。
+ */
+export function validatePassword(password: string, required = false): string {
   const pw = password.trim()
-  if (!pw) return ''
+  if (!pw) return required ? '請設定密碼' : ''
   if (pw.length < MIN_PASSWORD_LENGTH) return `密碼至少需要 ${MIN_PASSWORD_LENGTH} 個字`
   return ''
 }
@@ -150,13 +156,20 @@ export async function registerWithEmployeeId(
   name: string,
   employeeId: string,
   password = ''
-): Promise<void> {
+): Promise<User> {
   const credential = await createUserWithEmailAndPassword(
     getFirebaseAuth(),
     toInternalEmail(employeeId),
     toInternalPassword(resolveSecret(employeeId, password))
   )
   await updateProfile(credential.user, { displayName: name })
+  return credential.user
+}
+
+/** 註冊碼不對時把剛建立的帳號收回，避免留下一堆進不去的空帳號。 */
+export async function discardCurrentAccount(): Promise<void> {
+  const user = getFirebaseAuth().currentUser
+  if (user) await deleteUser(user)
 }
 
 /** 從登入中的帳號取回員編（內部信箱格式為 u{員編}@loan.local）。 */
