@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Download, FileText, Loader2, Printer, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Download,
+  FileText,
+  Loader2,
+  Maximize2,
+  Minus,
+  Plus,
+  Printer,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 import { ALL_FILTER_STAGES, STAGE_CONFIG } from '../../data/stages'
 import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS, type ReportFilters } from '../../utils/reportFilters'
 import { getSummaryCounts } from '../../utils/metrics'
@@ -12,6 +25,10 @@ import type { LoanCase, StageKey } from '../../types'
 
 /** A4 橫式扣掉邊界後的內容寬度（273mm 換算為 96dpi 像素） */
 const SHEET_WIDTH_PX = 1032
+/** 手機縮到符合寬度會小到看不清楚，預設至少放大到這個比例，改以左右滑動查看 */
+const MIN_READABLE_SCALE = 0.85
+const MAX_SCALE = 1.6
+const ZOOM_STEP = 0.15
 
 type Step = 'filter' | 'preview'
 
@@ -28,9 +45,15 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
   const [downloadError, setDownloadError] = useState('')
 
   const previewRef = useRef<HTMLDivElement>(null)
-  const frameRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const zoomInitialised = useRef(false)
+  const [fitScale, setFitScale] = useState(1)
+  /** null 代表「符合寬度」，其他數字為使用者自行調整的顯示比例 */
+  const [zoom, setZoom] = useState<number | null>(null)
   const [naturalHeight, setNaturalHeight] = useState(0)
+
+  const scale = zoom ?? fitScale
+  const isScrollable = scale > fitScale + 0.001
 
   const filteredCases = useMemo(() => applyReportFilters(cases, filters), [cases, filters])
   const summary = getSummaryCounts(filteredCases)
@@ -43,15 +66,26 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
     [cases]
   )
 
-  // 報表為 A4 實際尺寸，於畫面上等比縮小以完整顯示，手機才不會被裁掉右半邊
+  // 先量出「剛好塞滿寬度」的比例，再據以決定預設顯示比例
   useEffect(() => {
-    if (!open || step !== 'preview') return
-    const frame = frameRef.current
-    if (!frame) return
-    const update = () => setScale(Math.min(1, frame.clientWidth / SHEET_WIDTH_PX))
+    if (!open || step !== 'preview') {
+      zoomInitialised.current = false
+      return
+    }
+    const box = scrollRef.current
+    if (!box) return
+    const update = () => {
+      const fit = Math.min(1, box.clientWidth / SHEET_WIDTH_PX)
+      setFitScale(fit)
+      // 量到寬度之後才決定預設值，且只決定一次，之後交給使用者自行調整
+      if (!zoomInitialised.current) {
+        zoomInitialised.current = true
+        setZoom(fit < MIN_READABLE_SCALE ? MIN_READABLE_SCALE : null)
+      }
+    }
     update()
     const observer = new ResizeObserver(update)
-    observer.observe(frame)
+    observer.observe(box)
     return () => observer.disconnect()
   }, [open, step])
 
@@ -281,9 +315,75 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
               ) : (
                 <>
                   <div className="print-scroll flex-1 overflow-y-auto">
-                    {/* 統整結果：手機上也讀得清楚，不必依賴縮小後的 A4 版面 */}
-                    <div className="print-hide px-5 py-5 sm:px-6">
-                      <p className="mb-3 text-xs font-medium text-ink-soft">{describeFilters(filters)}</p>
+                    {/* A4 橫式版面放最上面，並附上縮放控制 */}
+                    <div className="print-hide flex flex-wrap items-center justify-between gap-2 px-5 pb-2 pt-4 sm:px-6">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-ink-soft">版面預覽</p>
+                        <p className="mt-0.5 text-[11px] text-ink-faint">
+                          實際列印／下載的 A4 橫式版面
+                          {isScrollable && <span className="text-primary">，可左右滑動</span>}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1 rounded-xl bg-slate-50 p-1">
+                        <button
+                          onClick={() => setZoom(Math.max(fitScale, scale - ZOOM_STEP))}
+                          disabled={scale <= fitScale + 0.001}
+                          aria-label="縮小"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft transition-colors duration-150 hover:bg-white hover:text-ink disabled:cursor-not-allowed disabled:text-ink-faint/50 disabled:hover:bg-transparent"
+                        >
+                          <Minus size={15} />
+                        </button>
+                        <span
+                          aria-label="目前縮放比例"
+                          className="w-11 text-center text-[11px] font-semibold tabular-nums text-ink-soft"
+                        >
+                          {Math.round(scale * 100)}%
+                        </span>
+                        <button
+                          onClick={() => setZoom(Math.min(MAX_SCALE, scale + ZOOM_STEP))}
+                          disabled={scale >= MAX_SCALE - 0.001}
+                          aria-label="放大"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft transition-colors duration-150 hover:bg-white hover:text-ink disabled:cursor-not-allowed disabled:text-ink-faint/50 disabled:hover:bg-transparent"
+                        >
+                          <Plus size={15} />
+                        </button>
+                        <button
+                          onClick={() => setZoom(null)}
+                          aria-label="符合寬度"
+                          title="整張放進畫面"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft transition-colors duration-150 hover:bg-white hover:text-ink"
+                        >
+                          <Maximize2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 等比縮放的 A4 版面；下載時仍以原始尺寸輸出 */}
+                    <div className="print-scroll px-5 pb-4 sm:px-6">
+                      <div ref={scrollRef} className="print-scroll overflow-x-auto">
+                        <div
+                          className="report-frame overflow-hidden"
+                          style={{
+                            width: SHEET_WIDTH_PX * scale,
+                            height: naturalHeight ? naturalHeight * scale : undefined,
+                          }}
+                        >
+                          <div
+                            className="report-scaler origin-top-left"
+                            style={{ transform: `scale(${scale})`, width: SHEET_WIDTH_PX }}
+                          >
+                            <div ref={previewRef}>
+                              <PrintableReport cases={filteredCases} filters={filters} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 統計數字改放在版面下方，往下捲即可看到 */}
+                    <div className="print-hide border-t border-slate-100 px-5 py-4 sm:px-6">
+                      <p className="text-xs font-semibold text-ink-soft">統計摘要</p>
+                      <p className="mb-3 mt-0.5 text-[11px] text-ink-faint">{describeFilters(filters)}</p>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {summaryTiles.map((tile) => (
                           <div
@@ -301,29 +401,6 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                             </p>
                           </div>
                         ))}
-                      </div>
-                    </div>
-
-                    <div className="print-hide px-5 pb-1 sm:px-6">
-                      <p className="text-xs font-semibold text-ink-soft">版面預覽</p>
-                      <p className="mt-0.5 text-[11px] text-ink-faint">以下為實際列印/下載的 A4 橫式版面</p>
-                    </div>
-
-                    {/* 等比縮小的 A4 版面；下載時仍以原始尺寸輸出 */}
-                    <div className="print-scroll px-5 py-3 sm:px-6">
-                      <div
-                        ref={frameRef}
-                        className="report-frame overflow-hidden"
-                        style={{ height: naturalHeight ? naturalHeight * scale : undefined }}
-                      >
-                        <div
-                          className="report-scaler origin-top-left"
-                          style={{ transform: `scale(${scale})`, width: SHEET_WIDTH_PX }}
-                        >
-                          <div ref={previewRef}>
-                            <PrintableReport cases={filteredCases} filters={filters} />
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
