@@ -22,17 +22,29 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
     }
 
-    function registrationCode() {
-      return get(/databases/$(database)/documents/config/registration).data.code;
+    function registrationDoc() {
+      return get(/databases/$(database)/documents/config/registration).data;
     }
 
-    // 註冊碼必須真的是一組有內容的字串。
+    // 比對前先正規化：去除前後空白、統一大小寫，數字型別也轉成文字。
+    // 在 Console 手動輸入註冊碼很容易多打一個空格或把型別存成數字，
+    // 這些都不該讓同仁被擋在門外。
+    function normalizedCode(value) {
+      return string(value).trim().lower();
+    }
+
+    // 註冊碼必須真的存在且有內容。
     // 萬一 code 欄位被誤刪或清空，這裡會讓所有人都加不進名冊（寧可鎖住也不放行），
     // 而不是變成「送出空值就能通過比對」。
     function codeIsSet() {
       return exists(/databases/$(database)/documents/config/registration)
-             && registrationCode() is string
-             && registrationCode().size() >= 4;
+             && 'code' in registrationDoc()
+             && normalizedCode(registrationDoc().code).size() >= 4;
+    }
+
+    function codeMatches() {
+      return 'code' in request.resource.data
+             && normalizedCode(request.resource.data.code) == normalizedCode(registrationDoc().code);
     }
 
     // 成員名冊：只能把自己加進來，而且必須附上正確的註冊碼
@@ -41,11 +53,11 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.auth.uid == uid
                     && codeIsSet()
-                    && request.resource.data.code == registrationCode();
+                    && codeMatches();
       allow update: if isSignedIn()
                     && request.auth.uid == uid
                     && codeIsSet()
-                    && request.resource.data.code == registrationCode();
+                    && codeMatches();
       // 只能把自己移出名冊（要再進來一樣得輸入註冊碼）
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
