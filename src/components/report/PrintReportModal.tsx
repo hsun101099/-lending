@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Download, FileText, Loader2, Printer, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
 import { ALL_FILTER_STAGES, STAGE_CONFIG } from '../../data/stages'
-import { OFFICER_OPTIONS } from '../../data/officers'
 import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS, type ReportFilters } from '../../utils/reportFilters'
 import { getSummaryCounts } from '../../utils/metrics'
 import { formatWan } from '../../utils/format'
@@ -38,10 +37,11 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
   const totalAmount = filteredCases.reduce((sum, c) => sum + c.loanAmount, 0)
   const overdueCount = filteredCases.filter(isOverdue).length
 
-  const officerChoices = useMemo(() => {
-    const fromData = cases.map((c) => c.officer).filter(Boolean)
-    return Array.from(new Set([...OFFICER_OPTIONS, ...fromData]))
-  }, [cases])
+  // 承辦人為自由輸入，選單直接取自實際資料，只列出真的存在的承辦人
+  const officerChoices = useMemo(
+    () => Array.from(new Set(cases.map((c) => c.officer).filter(Boolean))).sort(),
+    [cases]
+  )
 
   // 報表為 A4 實際尺寸，於畫面上等比縮小以完整顯示，手機才不會被裁掉右半邊
   useEffect(() => {
@@ -137,6 +137,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                 </div>
                 <button
                   onClick={handleClose}
+                  aria-label="關閉"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
                 >
                   <X size={18} />

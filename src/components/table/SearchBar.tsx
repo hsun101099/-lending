@@ -19,6 +19,7 @@ export default function SearchBar({ value, onChange, placeholder }: SearchBarPro
       {value && (
         <button
           onClick={() => onChange('')}
+          aria-label="清除搜尋"
           className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint transition-colors hover:text-ink"
         >
           <X size={14} />

@@ -27,9 +27,11 @@ export function getFirebaseAuth(): Auth {
 
 export function getDb(): Firestore {
   if (!dbInstance) {
-    // 開啟本機快取：再次開啟網頁時先以快取即時顯示，同時在背景與雲端同步。
     dbInstance = initializeFirestore(ensureApp(), {
+      // 開啟本機快取：再次開啟網頁時先以快取即時顯示，同時在背景與雲端同步。
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      // 忽略值為 undefined 的欄位，避免任一寫入路徑因此整筆存檔失敗。
+      ignoreUndefinedProperties: true,
     })
   }
   return dbInstance

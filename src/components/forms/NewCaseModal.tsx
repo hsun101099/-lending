@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Banknote, Briefcase, CalendarDays, FilePlus2, ListChecks, Tags, User, X } from 'lucide-react'
 import { LOAN_TYPE_OPTIONS } from '../../data/loanTypes'
 import { CATEGORY_OPTIONS } from '../../data/categories'
-import { OFFICER_OPTIONS } from '../../data/officers'
 import { STAGE_CONFIG, STAGE_ORDER } from '../../data/stages'
 import { getTodayIso } from '../../utils/today'
 import { wanToNt } from '../../utils/format'
@@ -62,7 +61,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
       loanAmount: wanToNt(amountWan),
       loanType: form.loanType,
       category: form.category,
-      officer: form.officer,
+      officer: form.officer.trim(),
       createdDate: form.createdDate,
       remarks: form.remarks.trim(),
       currentStage: form.currentStage,
@@ -109,6 +108,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                 </div>
                 <button
                   onClick={handleClose}
+                  aria-label="關閉"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
                 >
                   <X size={18} />
@@ -195,19 +195,13 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                     <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
                       <User size={12} /> 承辦人
                     </label>
-                    <select
+                    <input
                       value={form.officer}
                       onChange={(e) => setForm((f) => ({ ...f, officer: e.target.value }))}
-                      className={`${inputClass(errors.officer)} ${form.officer ? '' : 'text-ink-faint'}`}
-                    >
-                      <option value="">請選擇承辦人</option>
-                      {OFFICER_OPTIONS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                    {touched && errors.officer && <p className="mt-1 text-xs text-danger">請選擇承辦人</p>}
+                      placeholder="例如：王先生"
+                      className={inputClass(errors.officer)}
+                    />
+                    {touched && errors.officer && <p className="mt-1 text-xs text-danger">請輸入承辦人</p>}
                   </div>
 
                   <div>

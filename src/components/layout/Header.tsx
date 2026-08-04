@@ -45,6 +45,7 @@ export default function Header({ title, subtitle, overdueCount, userName, onLogo
         <div className="relative">
           <button
             onClick={() => setNotifOpen((v) => !v)}
+            aria-label="通知"
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-ink-soft transition-colors duration-200 hover:bg-slate-100 hover:text-ink"
           >
             <Bell size={17} />
@@ -82,6 +83,7 @@ export default function Header({ title, subtitle, overdueCount, userName, onLogo
           <button
             onClick={onLogout}
             title="登出"
+            aria-label="登出"
             className="ml-1 flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
           >
             <LogOut size={16} />

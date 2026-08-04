@@ -70,17 +70,28 @@ export function advanceStage(loanCase: LoanCase): LoanCase {
   const idx = STAGE_ORDER.indexOf(loanCase.currentStage)
   const nextStage = STAGE_ORDER[idx + 1]
   const today = getTodayIso()
+  // 撥款為流程終點，抵達即代表全案完成，不再是「進行中」
+  const reachesFinalStage = nextStage === 'disbursement'
 
   const timeline = loanCase.timeline.map((step, i) => {
     if (i === idx) {
       return { ...step, status: 'completed' as const, completedDate: today }
     }
     if (i === idx + 1) {
-      return {
-        ...step,
-        status: 'current' as const,
-        description: `${STAGE_CONFIG[nextStage].label}進行中，${loanCase.officer}承辦處理。`,
-      }
+      return reachesFinalStage
+        ? {
+            ...step,
+            status: 'completed' as const,
+            completedDate: today,
+            officer: step.officer ?? loanCase.officer,
+            description: `${STAGE_CONFIG[nextStage].label}作業已完成，資料已歸檔存查。`,
+          }
+        : {
+            ...step,
+            status: 'current' as const,
+            officer: step.officer ?? loanCase.officer,
+            description: `${STAGE_CONFIG[nextStage].label}進行中，${loanCase.officer}承辦處理。`,
+          }
     }
     return step
   })

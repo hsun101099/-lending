@@ -87,12 +87,14 @@ export default function CaseDrawer({
                 <button
                   onClick={() => onDelete(loanCase)}
                   title="刪除案件"
+                  aria-label="刪除案件"
                   className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
                 >
                   <Trash2 size={16} />
                 </button>
                 <button
                   onClick={onClose}
+                  aria-label="關閉案件詳情"
                   className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-slate-100 hover:text-ink"
                 >
                   <X size={18} />

@@ -8,6 +8,14 @@ import type { LoanCase, TimelineStep } from '../types'
  * 先前建立的案件時間軸只涵蓋舊的階段，直接顯示會缺漏。
  * 這裡以現行流程重建時間軸，並保留原有的完成日期、承辦人與備註。
  */
+/**
+ * 移除值為 undefined 的欄位。
+ * Firestore 不接受 undefined，若直接寫入會整筆存檔失敗。
+ */
+function omitUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T
+}
+
 export function normalizeCase(loanCase: LoanCase): LoanCase {
   const currentStage = isStageKey(loanCase.currentStage) ? loanCase.currentStage : 'intake'
   const existing = new Map((loanCase.timeline ?? []).map((step) => [step.key, step]))
@@ -24,14 +32,14 @@ export function normalizeCase(loanCase: LoanCase): LoanCase {
   const timeline: TimelineStep[] = STAGE_ORDER.map((key, i) => {
     const cfg = STAGE_CONFIG[key]
     const prev = existing.get(key)
-    const base = {
+    const base = omitUndefined({
       key,
       label: cfg.label,
       officer: prev?.officer,
       note: prev?.note,
       attachments: prev?.attachments,
       completedDate: prev?.completedDate,
-    }
+    })
 
     const completedCount = isWithdrawn ? withdrawnCompletedCount : isFullyDone ? STAGE_ORDER.length : currentIdx
 
@@ -70,10 +78,10 @@ export function normalizeCase(loanCase: LoanCase): LoanCase {
     })
   }
 
-  return {
+  return omitUndefined({
     ...loanCase,
     currentStage,
     progress: stageProgress(currentStage),
     timeline,
-  }
+  })
 }

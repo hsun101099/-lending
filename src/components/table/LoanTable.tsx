@@ -121,6 +121,7 @@ export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCa
                             onDelete(loanCase)
                           }}
                           title="刪除案件"
+                          aria-label={`刪除 ${loanCase.customerName} 的案件`}
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
                         >
                           <Trash2 size={14} />
