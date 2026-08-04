@@ -108,8 +108,15 @@ function App() {
         setLoadError('')
       },
       (error) => {
-        setLoadError(`讀取案件資料失敗：${error.message}`)
         setCasesLoading(false)
+        // 讀不到案件幾乎都是因為沒通過註冊碼那一關，此時請他輸入註冊碼，
+        // 不要丟一句英文錯誤讓人不知道該怎麼辦。
+        if ('code' in error && error.code === 'permission-denied') {
+          setAllCases([])
+          setMembership('needsCode')
+          return
+        }
+        setLoadError(`讀取案件資料失敗：${error.message}`)
       }
     )
   }, [user, joined])

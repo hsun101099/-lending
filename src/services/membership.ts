@@ -36,8 +36,10 @@ export function watchMembership(uid: string, onStatus: (status: MembershipStatus
   return onSnapshot(
     doc(getDb(), MEMBERS, uid),
     (snap) => onStatus(snap.exists() ? 'member' : 'needsCode'),
-    // 讀自己的名冊資料被拒絕，代表新規則還沒發布（舊規則沒有這個路徑）
-    () => onStatus('rulesNotReady')
+    (error) =>
+      // 規則允許每個人讀自己的名冊資料，所以被拒絕就代表這個帳號沒有通過註冊碼那一關，
+      // 應該請他輸入註冊碼。其他錯誤（例如手機收訊不穩）才沿用舊行為放行。
+      onStatus(errorCode(error) === 'permission-denied' ? 'needsCode' : 'rulesNotReady')
   )
 }
 
@@ -45,10 +47,9 @@ export async function checkMembership(uid: string): Promise<MembershipStatus> {
   try {
     const snap = await getDoc(doc(getDb(), MEMBERS, uid))
     return snap.exists() ? 'member' : 'needsCode'
-  } catch {
-    // 讀自己的名冊資料被拒絕，代表新規則還沒發布（舊規則沒有這個路徑）。
-    // 此時沿用舊行為讓大家照常使用，真正的把關等規則發布後由資料庫端接手。
-    return 'rulesNotReady'
+  } catch (error) {
+    // 同 watchMembership：被拒絕＝沒通過註冊碼；其他錯誤才放行。
+    return errorCode(error) === 'permission-denied' ? 'needsCode' : 'rulesNotReady'
   }
 }
 
