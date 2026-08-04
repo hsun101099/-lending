@@ -1,10 +1,12 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   onSnapshot,
   runTransaction,
   setDoc,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore'
 import { getDb } from './firebase'
@@ -63,7 +65,27 @@ export async function saveCase(loanCase: LoanCase): Promise<void> {
   await setDoc(doc(getDb(), CASES, id), payload)
 }
 
-export async function removeCase(id: string): Promise<void> {
+/**
+ * 刪除案件＝移到回收桶。
+ * 資料仍留在雲端，只是加上刪除標記，誤刪時可以完整復原。
+ */
+export async function softDeleteCase(id: string, deletedBy: string): Promise<void> {
+  await updateDoc(doc(getDb(), CASES, id), {
+    deletedAt: new Date().toISOString(),
+    deletedBy: deletedBy || '未知',
+  })
+}
+
+/** 從回收桶復原案件。 */
+export async function restoreCase(id: string): Promise<void> {
+  await updateDoc(doc(getDb(), CASES, id), {
+    deletedAt: deleteField(),
+    deletedBy: deleteField(),
+  })
+}
+
+/** 永久刪除，資料無法再復原。僅供回收桶內明確確認後使用。 */
+export async function purgeCase(id: string): Promise<void> {
   await deleteDoc(doc(getDb(), CASES, id))
 }
 

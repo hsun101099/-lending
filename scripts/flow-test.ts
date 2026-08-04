@@ -13,6 +13,8 @@ import { normalizeCase } from '../src/utils/normalizeCase'
 import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS } from '../src/utils/reportFilters'
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
 import { formatWan, wanToNt, formatDate } from '../src/utils/format'
+import { describeDeletedAt, isDeleted, partitionCases } from '../src/utils/recycleBin'
+import { normalizeEmployeeId, validateEmployeeId } from '../src/hooks/useAuth'
 import type { LoanCase } from '../src/types'
 
 let failures = 0
@@ -217,6 +219,61 @@ check(
   ALL_FILTER_STAGES.every((s) => !!STAGE_CONFIG[s]?.label && !!STAGE_CONFIG[s]?.color),
   '每個階段都有名稱與顏色'
 )
+
+console.log('=== 7. 刪除與復原（回收桶）===')
+{
+  const sample = mixed.slice(0, 5)
+  const deletedAt = '2026-07-15T09:00:00.000Z'
+  const removed: LoanCase = { ...sample[1], deletedAt, deletedBy: '王先生' }
+  const withTrash = [sample[0], removed, sample[2], { ...sample[3], deletedAt: '2026-07-16T09:00:00.000Z' }]
+
+  check(isDeleted(removed), '有 deletedAt 即視為已刪除')
+  check(!isDeleted(sample[0]), '沒有 deletedAt 即為一般案件')
+
+  const { active, deleted } = partitionCases(withTrash)
+  check(active.length === 2, '已刪除案件不列入一般清單', String(active.length))
+  check(deleted.length === 2, '已刪除案件進入回收桶', String(deleted.length))
+  check(active.every((c) => !c.deletedAt), '一般清單不含刪除標記')
+  check(deleted[0].deletedAt === '2026-07-16T09:00:00.000Z', '回收桶以最近刪除的排最前面', deleted[0].deletedAt ?? '')
+
+  // 統計與報表都只吃 active，刪除的案件不能影響數字
+  const before = getSummaryCounts(partitionCases(sample).active)
+  const after = getSummaryCounts(partitionCases([...sample.slice(0, 1), removed, ...sample.slice(2)]).active)
+  check(after.total === before.total - 1, '刪除後統計扣除該案件', `${before.total} → ${after.total}`)
+  check(
+    applyReportFilters(partitionCases(withTrash).active, EMPTY_REPORT_FILTERS).every((c) => !c.deletedAt),
+    '報表不會印出已刪除案件'
+  )
+
+  // 復原＝清掉刪除標記，其餘欄位原封不動
+  const { deletedAt: _a, deletedBy: _b, ...restored } = removed
+  check(!isDeleted(restored as LoanCase), '復原後回到一般狀態')
+  check(
+    JSON.stringify({ ...(restored as LoanCase), timeline: [] }) === JSON.stringify({ ...sample[1], timeline: [] }),
+    '復原後案件內容與刪除前一致'
+  )
+  const bad = findUndefinedPaths(restored)
+  check(bad.length === 0, '復原後的案件可安全寫入 Firestore', bad.join(', '))
+
+  const now = new Date('2026-07-15T09:30:00.000Z')
+  check(describeDeletedAt(deletedAt, now) === '30 分鐘前', '刪除時間顯示', describeDeletedAt(deletedAt, now))
+  check(describeDeletedAt(undefined, now) === '', '沒有刪除時間則不顯示')
+  check(describeDeletedAt('2026-07-15T09:29:40.000Z', now) === '剛剛', '剛刪除的顯示為「剛剛」')
+}
+
+console.log('=== 8. 員編登入 ===')
+{
+  check(normalizeEmployeeId(' A1234 ') === 'a1234', '員編去除空白並轉小寫', normalizeEmployeeId(' A1234 '))
+  check(normalizeEmployeeId('1234') === '1234', '純數字員編維持原樣（舊帳號相容）', normalizeEmployeeId('1234'))
+  check(normalizeEmployeeId('a1234') === normalizeEmployeeId('A1234'), '大小寫視為同一人')
+  check(validateEmployeeId('') === '請輸入員編', '空白時提示輸入')
+  check(validateEmployeeId('12') !== '', '太短的員編不通過')
+  check(validateEmployeeId('1234') === '', '4 碼數字員編通過（既有帳號）', validateEmployeeId('1234'))
+  check(validateEmployeeId('A12345') === '', '英數員編通過', validateEmployeeId('A12345'))
+  check(validateEmployeeId('A-1234') === '', '含連字號的員編通過', validateEmployeeId('A-1234'))
+  check(validateEmployeeId('王小明') !== '', '中文員編不通過')
+  check(validateEmployeeId('a b@c') !== '', '含特殊符號不通過')
+}
 
 console.log(`\n${failures === 0 ? '✅ 全部通過' : '❌ 有失敗項目'}：${checks - failures}/${checks} 項檢查通過\n`)
 process.exit(failures === 0 ? 0 : 1)

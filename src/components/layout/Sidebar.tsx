@@ -5,12 +5,14 @@ import {
   BarChart3,
   Settings,
   Landmark,
+  Trash2,
 } from 'lucide-react'
 import type { ViewMode } from '../../App'
 
 interface SidebarProps {
   view: ViewMode
   onChangeView: (view: ViewMode) => void
+  deletedCount: number
 }
 
 const NAV_ITEMS: { key: ViewMode | null; label: string; icon: typeof LayoutDashboard; enabled: boolean }[] = [
@@ -18,9 +20,10 @@ const NAV_ITEMS: { key: ViewMode | null; label: string; icon: typeof LayoutDashb
   { key: null, label: '案件管理', icon: FileText, enabled: false },
   { key: null, label: '客戶資料', icon: Users, enabled: false },
   { key: 'manager', label: '主管報表', icon: BarChart3, enabled: true },
+  { key: 'trash', label: '已刪除案件', icon: Trash2, enabled: true },
 ]
 
-export default function Sidebar({ view, onChangeView }: SidebarProps) {
+export default function Sidebar({ view, onChangeView, deletedCount }: SidebarProps) {
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white lg:flex">
       <div className="flex items-center gap-2.5 px-6 py-6">
@@ -52,6 +55,11 @@ export default function Sidebar({ view, onChangeView }: SidebarProps) {
             >
               <Icon size={18} strokeWidth={active ? 2.4 : 2} />
               {item.label}
+              {item.key === 'trash' && deletedCount > 0 && (
+                <span className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-ink-soft">
+                  {deletedCount}
+                </span>
+              )}
               {!item.enabled && (
                 <span className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-ink-faint">
                   即將推出

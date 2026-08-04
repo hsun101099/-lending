@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { KeyRound, Landmark, Loader2, User } from 'lucide-react'
+import { IdCard, Landmark, Loader2, User } from 'lucide-react'
 import {
   describeAuthError,
-  loginWithPin,
-  MIN_PIN_LENGTH,
-  registerWithPin,
-  validatePin,
+  loginWithEmployeeId,
+  MIN_EMPLOYEE_ID_LENGTH,
+  registerWithEmployeeId,
+  validateEmployeeId,
 } from '../../hooks/useAuth'
 
 type Mode = 'login' | 'register'
@@ -14,57 +14,42 @@ type Mode = 'login' | 'register'
 export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
-  const [pin, setPin] = useState('')
-  const [pinConfirm, setPinConfirm] = useState('')
+  const [employeeId, setEmployeeId] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   function switchMode(next: Mode) {
     setMode(next)
     setError('')
-    setPin('')
-    setPinConfirm('')
+    setEmployeeId('')
     setName('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const pinError = validatePin(pin)
-    if (pinError) {
-      setError(pinError)
+    const idError = validateEmployeeId(employeeId)
+    if (idError) {
+      setError(idError)
       return
     }
-    if (mode === 'register') {
-      if (!name.trim()) {
-        setError('請輸入姓名')
-        return
-      }
-      if (pin !== pinConfirm) {
-        setError('兩次輸入的數字不一致')
-        return
-      }
+    if (mode === 'register' && !name.trim()) {
+      setError('請輸入姓名')
+      return
     }
 
     setError('')
     setSubmitting(true)
     try {
       if (mode === 'login') {
-        await loginWithPin(pin)
+        await loginWithEmployeeId(employeeId)
       } else {
-        await registerWithPin(name.trim(), pin)
+        await registerWithEmployeeId(name.trim(), employeeId)
       }
     } catch (err) {
       setError(describeAuthError(err, mode))
       setSubmitting(false)
     }
-  }
-
-  // 手機上叫出數字鍵盤，減少輸入錯誤
-  const pinInputProps = {
-    inputMode: 'numeric' as const,
-    pattern: '[0-9]*',
-    autoComplete: 'off',
   }
 
   const inputClass =
@@ -84,7 +69,7 @@ export default function LoginScreen() {
           </div>
           <h1 className="text-lg font-bold text-ink">銀行放款流程管理系統</h1>
           <p className="mt-1 text-xs text-ink-faint">
-            {mode === 'login' ? '請輸入你設定的數字密碼' : '設定姓名與數字密碼即可開始使用'}
+            {mode === 'login' ? '請輸入你的員編' : '填寫姓名與員編即可開始使用'}
           </p>
         </div>
 
@@ -122,43 +107,28 @@ export default function LoginScreen() {
 
           <div>
             <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
-              數字密碼{mode === 'register' && `（至少 ${MIN_PIN_LENGTH} 位）`}
+              員編{mode === 'register' && `（至少 ${MIN_EMPLOYEE_ID_LENGTH} 碼）`}
             </label>
             <div className="relative">
-              <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+              <IdCard size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
               <input
-                type="password"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="請輸入數字"
-                {...pinInputProps}
-                className={inputClass}
+                value={employeeId}
+                // 員編只會有英數與連字號，先擋掉其他字元避免登入時才報錯
+                onChange={(e) => setEmployeeId(e.target.value.replace(/[^A-Za-z0-9-]/g, '').toUpperCase())}
+                placeholder="請輸入員編"
+                autoComplete="username"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className={`${inputClass} tracking-wider`}
               />
             </div>
           </div>
-
-          {mode === 'register' && (
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-ink-soft">再次輸入數字密碼</label>
-              <div className="relative">
-                <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  type="password"
-                  value={pinConfirm}
-                  onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
-                  placeholder="再輸入一次"
-                  {...pinInputProps}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          )}
 
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{error}</p>}
 
           <button
             type="submit"
-            disabled={submitting || !pin || (mode === 'register' && (!name || !pinConfirm))}
+            disabled={submitting || !employeeId || (mode === 'register' && !name)}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-ink-faint"
           >
             {submitting && <Loader2 size={15} className="animate-spin" />}
@@ -168,8 +138,8 @@ export default function LoginScreen() {
 
         <p className="mt-5 text-center text-[11px] leading-relaxed text-ink-faint">
           {mode === 'login'
-            ? '第一次使用請點上方「建立帳號」'
-            : '數字密碼就是你的登入方式，請自行牢記，忘記將無法自行取回'}
+            ? '第一次使用請點上方「建立帳號」；先前用數字登入的同仁，輸入原本那組數字即可'
+            : '之後只要輸入員編就能登入，不需要另外記密碼'}
         </p>
       </motion.div>
     </div>

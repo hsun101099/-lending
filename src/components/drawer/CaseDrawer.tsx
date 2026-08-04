@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, Tags, User, X, XCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
+import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, Tags, User, X, XCircle, ArrowUpCircle, Trash2, Undo2 } from 'lucide-react'
 import type { LoanCase } from '../../types'
 import { formatWan, formatDate } from '../../utils/format'
+import { describeDeletedAt, isDeleted } from '../../utils/recycleBin'
 import StatusBadge from '../table/StatusBadge'
 import ProgressBar from '../table/ProgressBar'
 import Timeline from './Timeline'
@@ -17,6 +18,7 @@ interface CaseDrawerProps {
   onWithdraw: (id: string) => void
   onUpdateRemarks: (id: string, remarks: string) => void
   onDelete: (loanCase: LoanCase) => void
+  onRestore: (loanCase: LoanCase) => void
 }
 
 export default function CaseDrawer({
@@ -26,6 +28,7 @@ export default function CaseDrawer({
   onWithdraw,
   onUpdateRemarks,
   onDelete,
+  onRestore,
 }: CaseDrawerProps) {
   const [remarksDraft, setRemarksDraft] = useState('')
 
@@ -33,6 +36,7 @@ export default function CaseDrawer({
     setRemarksDraft(loanCase?.remarks ?? '')
   }, [loanCase?.id, loanCase?.remarks])
 
+  const deleted = !!loanCase && isDeleted(loanCase)
   const isConcluded = loanCase && (loanCase.currentStage === 'disbursement' || loanCase.currentStage === 'withdrawn')
   const overdue = loanCase ? isOverdue(loanCase) : false
   const nextStageLabel =
@@ -84,14 +88,16 @@ export default function CaseDrawer({
                 <p className="mt-0.5 text-sm text-ink-faint">{loanCase.loanType} 貸款申請</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  onClick={() => onDelete(loanCase)}
-                  title="刪除案件"
-                  aria-label="刪除案件"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!deleted && (
+                  <button
+                    onClick={() => onDelete(loanCase)}
+                    title="刪除案件"
+                    aria-label="刪除案件"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   aria-label="關閉案件詳情"
@@ -103,6 +109,18 @@ export default function CaseDrawer({
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
+              {deleted && (
+                <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50/70 px-3.5 py-3">
+                  <Trash2 size={15} className="mt-0.5 shrink-0 text-danger" />
+                  <div>
+                    <p className="text-sm font-semibold text-ink">這筆案件已被刪除</p>
+                    <p className="mt-0.5 text-xs text-ink-soft">
+                      {describeDeletedAt(loanCase.deletedAt)}由 {loanCase.deletedBy || '未知'} 刪除，資料完整保留，可直接復原。
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-6 grid grid-cols-2 gap-3">
                 {infoItems.map((item) => (
                   <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
@@ -137,12 +155,15 @@ export default function CaseDrawer({
                 <textarea
                   value={remarksDraft}
                   onChange={(e) => setRemarksDraft(e.target.value)}
-                  onBlur={() => onUpdateRemarks(loanCase.id, remarksDraft)}
+                  onBlur={() => !deleted && onUpdateRemarks(loanCase.id, remarksDraft)}
+                  readOnly={deleted}
                   placeholder="例如：客戶補件中 / 等待主管批示 / 待保證人資料..."
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm text-ink placeholder:text-ink-faint transition-all duration-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-blue-100"
+                  className={`w-full resize-none rounded-xl border border-slate-200 p-3 text-sm text-ink placeholder:text-ink-faint transition-all duration-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                    deleted ? 'bg-slate-50 text-ink-soft' : ''
+                  }`}
                 />
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className={`mt-2 flex flex-wrap gap-1.5 ${deleted ? 'hidden' : ''}`}>
                   {REMARK_SUGGESTIONS.slice(0, 4).map((s) => (
                     <button
                       key={s}
@@ -160,6 +181,16 @@ export default function CaseDrawer({
             </div>
 
             <div className="flex gap-3 border-t border-slate-100 px-6 py-4">
+              {deleted ? (
+                <button
+                  onClick={() => onRestore(loanCase)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover"
+                >
+                  <Undo2 size={16} />
+                  復原此案件
+                </button>
+              ) : (
+                <>
               <button
                 onClick={() => onWithdraw(loanCase.id)}
                 disabled={!!isConcluded}
@@ -176,6 +207,8 @@ export default function CaseDrawer({
                 <ArrowUpCircle size={16} />
                 {nextStageLabel ? `更新流程至「${nextStageLabel}」` : '案件已結案'}
               </button>
+                </>
+              )}
             </div>
           </motion.aside>
         </>

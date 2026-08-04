@@ -14,7 +14,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
 } from 'firebase/auth'
-import { deleteDoc, doc, getDoc, getFirestore, setDoc } from 'firebase/firestore'
+import { deleteDoc, deleteField, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebase/firestore'
 import { firebaseConfig } from '../src/services/firebaseConfig'
 import { buildCase, advanceStage, withdrawCase } from '../src/utils/caseActions'
 import { normalizeCase } from '../src/utils/normalizeCase'
@@ -22,9 +22,10 @@ import { STAGE_CONFIG, STAGE_ORDER } from '../src/data/stages'
 import type { LoanCase } from '../src/types'
 
 const PREFIX = 'TEST-DELETE-ME'
-const TEST_PIN = String(Math.floor(100000 + Math.random() * 900000))
-const TEST_EMAIL = `u${TEST_PIN}@loan.local`
-const TEST_PASSWORD = `loanpin-${TEST_PIN}`
+// 以英數員編測試，同時驗證非純數字的員編也能建立帳號
+const TEST_EMPLOYEE_ID = `zztest${Math.floor(1000 + Math.random() * 9000)}`
+const TEST_EMAIL = `u${TEST_EMPLOYEE_ID}@loan.local`
+const TEST_PASSWORD = `loanpin-${TEST_EMPLOYEE_ID}`
 
 let pass = 0
 let fail = 0
@@ -64,14 +65,14 @@ async function main() {
   console.log('=== 1. 建立測試帳號並登入 ===')
   try {
     await createUserWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
-    ok(`建立測試帳號（數字密碼 ${TEST_PIN}）`)
+    ok(`建立測試帳號（員編 ${TEST_EMPLOYEE_ID}）`)
   } catch (e) {
     no('建立測試帳號', e)
     return
   }
   try {
     await signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
-    ok('以數字密碼登入')
+    ok('以員編登入')
   } catch (e) {
     no('登入', e)
     return
@@ -166,7 +167,59 @@ async function main() {
     await writeCase(advanceStage(legacyRead), '舊案件更新流程並寫回 ← 先前失敗之處')
   }
 
-  console.log('\n=== 6. 清理測試資料 ===')
+  console.log('\n=== 6. 刪除後可復原（回收桶）===')
+  const binId = `${PREFIX}-4`
+  let binCase = buildCase(
+    {
+      customerName: `${PREFIX} 誤刪測試`,
+      loanAmount: 3_000_000,
+      loanType: '理財週轉',
+      category: '新貸',
+      officer: '測試承辦',
+      createdDate: new Date().toISOString().slice(0, 10),
+      remarks: '測試誤刪復原',
+      currentStage: 'credit',
+    },
+    binId
+  )
+  if (await writeCase(binCase, '建立要被刪除的案件')) {
+    const before = await readCase(binId)
+    try {
+      await updateDoc(doc(db, 'cases', binId), {
+        deletedAt: new Date().toISOString(),
+        deletedBy: '測試承辦',
+      })
+      ok('刪除案件（移入回收桶）')
+    } catch (e) {
+      no('刪除案件（移入回收桶）', e)
+    }
+    const trashed = await readCase(binId)
+    if (trashed?.deletedAt) ok('案件仍在雲端，並標記為已刪除')
+    else no('案件標記為已刪除', '沒有 deletedAt')
+    if (trashed && trashed.timeline.length === STAGE_ORDER.length) ok('刪除後資料完整保留')
+    else no('刪除後資料完整保留', `時間軸 ${trashed?.timeline.length}`)
+
+    try {
+      await updateDoc(doc(db, 'cases', binId), { deletedAt: deleteField(), deletedBy: deleteField() })
+      ok('復原案件')
+    } catch (e) {
+      no('復原案件', e)
+    }
+    const restored = await readCase(binId)
+    if (restored && !restored.deletedAt && !restored.deletedBy) ok('復原後刪除標記已清除')
+    else no('復原後刪除標記已清除', JSON.stringify({ deletedAt: restored?.deletedAt }))
+    if (restored && before && restored.currentStage === before.currentStage && restored.remarks === before.remarks) {
+      ok('復原後內容與刪除前相同')
+    } else {
+      no('復原後內容與刪除前相同', `${before?.currentStage} → ${restored?.currentStage}`)
+    }
+    if (restored) {
+      binCase = advanceStage(restored)
+      await writeCase(binCase, '復原後仍可正常更新流程')
+    }
+  }
+
+  console.log('\n=== 7. 清理測試資料 ===')
   for (const id of createdDocs) {
     try {
       await deleteDoc(doc(db, 'cases', id))

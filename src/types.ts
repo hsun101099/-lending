@@ -50,6 +50,10 @@ export interface LoanCase {
   lastUpdated: string
   remarks: string
   timeline: TimelineStep[]
+  /** 刪除時間（ISO 字串）。有值代表案件在「已刪除案件」中，可隨時復原 */
+  deletedAt?: string
+  /** 執行刪除的人 */
+  deletedBy?: string
 }
 
 export interface SummaryMetric {
