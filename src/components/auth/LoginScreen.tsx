@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { IdCard, Landmark, Loader2, User } from 'lucide-react'
+import { IdCard, KeyRound, Landmark, Loader2, User } from 'lucide-react'
 import {
   describeAuthError,
   loginWithEmployeeId,
   MIN_EMPLOYEE_ID_LENGTH,
+  MIN_PASSWORD_LENGTH,
   registerWithEmployeeId,
   validateEmployeeId,
+  validatePassword,
 } from '../../hooks/useAuth'
 
 type Mode = 'login' | 'register'
@@ -15,6 +17,8 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
   const [employeeId, setEmployeeId] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -23,6 +27,8 @@ export default function LoginScreen() {
     setError('')
     setEmployeeId('')
     setName('')
+    setPassword('')
+    setPasswordConfirm('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -33,18 +39,29 @@ export default function LoginScreen() {
       setError(idError)
       return
     }
-    if (mode === 'register' && !name.trim()) {
-      setError('請輸入姓名')
-      return
+    if (mode === 'register') {
+      if (!name.trim()) {
+        setError('請輸入姓名')
+        return
+      }
+      const pwError = validatePassword(password)
+      if (pwError) {
+        setError(pwError)
+        return
+      }
+      if (password.trim() && password !== passwordConfirm) {
+        setError('兩次輸入的密碼不一致')
+        return
+      }
     }
 
     setError('')
     setSubmitting(true)
     try {
       if (mode === 'login') {
-        await loginWithEmployeeId(employeeId)
+        await loginWithEmployeeId(employeeId, password)
       } else {
-        await registerWithEmployeeId(name.trim(), employeeId)
+        await registerWithEmployeeId(name.trim(), employeeId, password)
       }
     } catch (err) {
       setError(describeAuthError(err, mode))
@@ -69,7 +86,7 @@ export default function LoginScreen() {
           </div>
           <h1 className="text-lg font-bold text-ink">銀行放款流程管理系統</h1>
           <p className="mt-1 text-xs text-ink-faint">
-            {mode === 'login' ? '請輸入你的員編' : '填寫姓名與員編即可開始使用'}
+            {mode === 'login' ? '請輸入你的員編' : '填寫姓名與員編即可開始使用，密碼可自行選擇是否設定'}
           </p>
         </div>
 
@@ -124,6 +141,40 @@ export default function LoginScreen() {
             </div>
           </div>
 
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
+              密碼<span className="font-normal text-ink-faint">（選填）</span>
+            </label>
+            <div className="relative">
+              <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'login' ? '沒設定密碼請留空' : `不想設定就留空（至少 ${MIN_PASSWORD_LENGTH} 個字）`}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {mode === 'register' && password.trim() !== '' && (
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-ink-soft">再次輸入密碼</label>
+              <div className="relative">
+                <KeyRound size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+                <input
+                  type="password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  placeholder="再輸入一次"
+                  autoComplete="new-password"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          )}
+
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{error}</p>}
 
           <button
@@ -138,8 +189,8 @@ export default function LoginScreen() {
 
         <p className="mt-5 text-center text-[11px] leading-relaxed text-ink-faint">
           {mode === 'login'
-            ? '第一次使用請點上方「建立帳號」；先前用數字登入的同仁，輸入原本那組數字即可'
-            : '之後只要輸入員編就能登入，不需要另外記密碼'}
+            ? '第一次使用請點上方「建立帳號」；先前用數字登入的同仁，員編填原本那組數字、密碼留空即可'
+            : '不設定密碼的話，之後只要輸入員編就能登入；登入後隨時可以在右上角補設密碼'}
         </p>
       </motion.div>
     </div>

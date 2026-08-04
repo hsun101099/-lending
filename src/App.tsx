@@ -11,6 +11,7 @@ import ConfirmDialog from './components/common/ConfirmDialog'
 import UndoToast from './components/common/UndoToast'
 import SetupNotice from './components/common/SetupNotice'
 import LoginScreen from './components/auth/LoginScreen'
+import PasswordModal from './components/auth/PasswordModal'
 import PrintReportModal from './components/report/PrintReportModal'
 import DeletedCasesPanel from './components/trash/DeletedCasesPanel'
 import { ALL_FILTER_STAGES } from './data/stages'
@@ -72,6 +73,7 @@ function App() {
   const [importing, setImporting] = useState(false)
   const [loadStalled, setLoadStalled] = useState(false)
   const [isPrintOpen, setPrintOpen] = useState(false)
+  const [isPasswordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -233,6 +235,7 @@ function App() {
           overdueCount={overdueCount}
           userName={user.displayName ?? ''}
           onLogout={() => logout()}
+          onChangePassword={() => setPasswordOpen(true)}
         />
 
         <div className="flex gap-2 border-b border-slate-200/70 bg-white px-4 py-2.5 sm:px-6 lg:hidden">
@@ -420,6 +423,8 @@ function App() {
         onConfirm={handleConfirmPurge}
         onCancel={() => setPendingPurge(null)}
       />
+
+      <PasswordModal open={isPasswordOpen} onClose={() => setPasswordOpen(false)} />
 
       <UndoToast
         open={!!justDeleted}

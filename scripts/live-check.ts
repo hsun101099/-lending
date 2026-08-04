@@ -8,14 +8,14 @@
  * 執行：npx tsx scripts/live-check.ts
  */
 import { initializeApp, deleteApp } from 'firebase/app'
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  getAuth,
-  signInWithEmailAndPassword,
-} from 'firebase/auth'
+import { deleteUser, getAuth } from 'firebase/auth'
 import { deleteDoc, deleteField, doc, getDoc, getFirestore, setDoc, updateDoc } from 'firebase/firestore'
 import { firebaseConfig } from '../src/services/firebaseConfig'
+import {
+  changePassword,
+  loginWithEmployeeId,
+  registerWithEmployeeId,
+} from '../src/hooks/useAuth'
 import { buildCase, advanceStage, withdrawCase } from '../src/utils/caseActions'
 import { normalizeCase } from '../src/utils/normalizeCase'
 import { STAGE_CONFIG, STAGE_ORDER } from '../src/data/stages'
@@ -24,8 +24,6 @@ import type { LoanCase } from '../src/types'
 const PREFIX = 'TEST-DELETE-ME'
 // 以英數員編測試，同時驗證非純數字的員編也能建立帳號
 const TEST_EMPLOYEE_ID = `zztest${Math.floor(1000 + Math.random() * 9000)}`
-const TEST_EMAIL = `u${TEST_EMPLOYEE_ID}@loan.local`
-const TEST_PASSWORD = `loanpin-${TEST_EMPLOYEE_ID}`
 
 let pass = 0
 let fail = 0
@@ -64,15 +62,15 @@ async function main() {
 
   console.log('=== 1. 建立測試帳號並登入 ===')
   try {
-    await createUserWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
-    ok(`建立測試帳號（員編 ${TEST_EMPLOYEE_ID}）`)
+    await registerWithEmployeeId('測試員', TEST_EMPLOYEE_ID)
+    ok(`建立測試帳號（員編 ${TEST_EMPLOYEE_ID}，未設密碼）`)
   } catch (e) {
     no('建立測試帳號', e)
     return
   }
   try {
-    await signInWithEmailAndPassword(auth, TEST_EMAIL, TEST_PASSWORD)
-    ok('以員編登入')
+    await loginWithEmployeeId(TEST_EMPLOYEE_ID)
+    ok('只用員編登入')
   } catch (e) {
     no('登入', e)
     return
@@ -219,7 +217,50 @@ async function main() {
     }
   }
 
-  console.log('\n=== 7. 清理測試資料 ===')
+  console.log('\n=== 7. 選填密碼 ===')
+  const PW = 'bank-2026'
+  async function expectLoginFails(label: string, id: string, pw: string) {
+    try {
+      await loginWithEmployeeId(id, pw)
+      no(label, '竟然登入成功')
+    } catch {
+      ok(label)
+    }
+  }
+
+  await expectLoginFails('未設密碼時，隨便輸入密碼會被擋下', TEST_EMPLOYEE_ID, 'whatever')
+
+  try {
+    await loginWithEmployeeId(TEST_EMPLOYEE_ID)
+    await changePassword(PW)
+    ok('設定密碼')
+  } catch (e) {
+    no('設定密碼', e)
+  }
+  try {
+    await loginWithEmployeeId(TEST_EMPLOYEE_ID, PW)
+    ok('以員編＋新密碼登入')
+  } catch (e) {
+    no('以員編＋新密碼登入', e)
+  }
+  await expectLoginFails('設密碼後，密碼留空無法登入', TEST_EMPLOYEE_ID, '')
+  await expectLoginFails('設密碼後，密碼打錯無法登入', TEST_EMPLOYEE_ID, 'bank-2027')
+
+  try {
+    await loginWithEmployeeId(TEST_EMPLOYEE_ID, PW)
+    await changePassword('')
+    ok('取消密碼')
+  } catch (e) {
+    no('取消密碼', e)
+  }
+  try {
+    await loginWithEmployeeId(TEST_EMPLOYEE_ID)
+    ok('取消密碼後回到只用員編登入')
+  } catch (e) {
+    no('取消密碼後回到只用員編登入', e)
+  }
+
+  console.log('\n=== 8. 清理測試資料 ===')
   for (const id of createdDocs) {
     try {
       await deleteDoc(doc(db, 'cases', id))

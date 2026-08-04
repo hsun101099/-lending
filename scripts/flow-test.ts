@@ -14,7 +14,13 @@ import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS } from '../sr
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
 import { formatWan, wanToNt, formatDate } from '../src/utils/format'
 import { describeDeletedAt, isDeleted, partitionCases } from '../src/utils/recycleBin'
-import { normalizeEmployeeId, validateEmployeeId } from '../src/hooks/useAuth'
+import {
+  getEmployeeId,
+  normalizeEmployeeId,
+  resolveSecret,
+  validateEmployeeId,
+  validatePassword,
+} from '../src/hooks/useAuth'
 import type { LoanCase } from '../src/types'
 
 let failures = 0
@@ -273,6 +279,26 @@ console.log('=== 8. 員編登入 ===')
   check(validateEmployeeId('A-1234') === '', '含連字號的員編通過', validateEmployeeId('A-1234'))
   check(validateEmployeeId('王小明') !== '', '中文員編不通過')
   check(validateEmployeeId('a b@c') !== '', '含特殊符號不通過')
+}
+
+console.log('=== 9. 選填密碼 ===')
+{
+  // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
+  check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))
+  check(resolveSecret('A1234', '   ') === 'a1234', '只打空白等同留空')
+  check(resolveSecret('1234', '') === '1234', '舊的數字帳號驗證方式不變')
+  check(resolveSecret('A1234', 'bank2026') === 'bank2026', '有設密碼時以密碼為準')
+  check(resolveSecret('A1234', 'Bank2026') !== resolveSecret('A1234', 'bank2026'), '密碼區分大小寫')
+  check(resolveSecret('A1234', ' pw12 ') === 'pw12', '密碼去除前後空白')
+
+  check(validatePassword('') === '', '密碼可以不設定')
+  check(validatePassword('   ') === '', '只打空白視為不設定')
+  check(validatePassword('abc') !== '', '密碼太短不通過')
+  check(validatePassword('abcd') === '', '四個字的密碼通過', validatePassword('abcd'))
+  check(validatePassword('銀行密碼') === '', '中文密碼可用', validatePassword('銀行密碼'))
+
+  check(getEmployeeId({ email: 'ua1234@loan.local' } as never) === 'a1234', '可從帳號取回員編')
+  check(getEmployeeId(null) === '', '未登入時取不到員編')
 }
 
 console.log(`\n${failures === 0 ? '✅ 全部通過' : '❌ 有失敗項目'}：${checks - failures}/${checks} 項檢查通過\n`)
