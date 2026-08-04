@@ -20,7 +20,7 @@ import { advanceStage, withdrawCase, type NewCaseInput } from './utils/caseActio
 import { partitionCases } from './utils/recycleBin'
 import { isFirebaseConfigured } from './services/firebaseConfig'
 import { logout, useAuth } from './hooks/useAuth'
-import { checkMembership, type MembershipStatus } from './services/membership'
+import { isJoinInProgress, watchMembership, type MembershipStatus } from './services/membership'
 import {
   createCase,
   importCases,
@@ -77,21 +77,24 @@ function App() {
   const [isPrintOpen, setPrintOpen] = useState(false)
   const [isAccountOpen, setAccountOpen] = useState(false)
   const [membership, setMembership] = useState<MembershipStatus | null>(null)
+  const [joinTick, setJoinTick] = useState(0)
 
-  // 先確認這個帳號在單位名冊裡，才開始讀案件資料
+  // 先確認這個帳號在單位名冊裡，才開始讀案件資料。
+  // 持續訂閱，這樣剛用註冊碼加入的人會立刻進到系統，不會被重複詢問。
   useEffect(() => {
     if (!user) {
       setMembership(null)
       return
     }
-    let cancelled = false
-    checkMembership(user.uid).then((status) => {
-      if (!cancelled) setMembership(status)
-    })
-    return () => {
-      cancelled = true
-    }
+    return watchMembership(user.uid, setMembership)
   }, [user])
+
+  // 加入名冊的空窗期每秒重新檢查一次，萬一寫入失敗也不會一直卡在載入中
+  useEffect(() => {
+    if (membership !== 'needsCode' || !isJoinInProgress()) return
+    const timer = setTimeout(() => setJoinTick((n) => n + 1), 1000)
+    return () => clearTimeout(timer)
+  }, [membership, joinTick])
 
   const joined = membership === 'member' || membership === 'rulesNotReady'
 
@@ -237,7 +240,8 @@ function App() {
 
   if (!user) return <LoginScreen />
 
-  if (membership === null) {
+  // 剛建立帳號的人已經輸入過註冊碼，名冊寫入完成前先顯示載入中，不要再問一次
+  if (membership === null || (membership === 'needsCode' && isJoinInProgress())) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-bg">
         <Loader2 size={22} className="animate-spin text-ink-faint" />

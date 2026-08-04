@@ -14,8 +14,10 @@ import {
 } from '../../hooks/useAuth'
 import {
   checkMembership,
+  clearJoinInProgress,
   describeMembershipError,
   joinWithCode,
+  markJoinInProgress,
 } from '../../services/membership'
 import { MIN_CODE_LENGTH } from './JoinScreen'
 
@@ -49,19 +51,25 @@ export default function LoginScreen() {
    * 註冊碼不對就把剛建立的帳號收回，不讓外人留下可用的帳號。
    */
   async function registerAndJoin() {
-    const user = await registerWithEmployeeId(name.trim(), employeeId, password)
+    // 建立帳號後主畫面會馬上看到登入狀態，先立記號避免它閃出註冊碼畫面
+    markJoinInProgress()
     try {
-      await joinWithCode({
-        uid: user.uid,
-        code,
-        name: name.trim(),
-        employeeId: getEmployeeId(user),
-      })
-    } catch (err) {
-      // 新版安全性規則尚未發布時，名冊本來就寫不進去，這種情況照舊放行
-      if ((await checkMembership(user.uid)) === 'rulesNotReady') return
-      await discardCurrentAccount().catch(() => {})
-      throw new JoinError(describeMembershipError(err, 'join'))
+      const user = await registerWithEmployeeId(name.trim(), employeeId, password)
+      try {
+        await joinWithCode({
+          uid: user.uid,
+          code,
+          name: name.trim(),
+          employeeId: getEmployeeId(user),
+        })
+      } catch (err) {
+        // 新版安全性規則尚未發布時，名冊本來就寫不進去，這種情況照舊放行
+        if ((await checkMembership(user.uid)) === 'rulesNotReady') return
+        await discardCurrentAccount().catch(() => {})
+        throw new JoinError(describeMembershipError(err, 'join'))
+      }
+    } finally {
+      clearJoinInProgress()
     }
   }
 

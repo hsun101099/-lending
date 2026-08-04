@@ -204,6 +204,31 @@ check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王先生' }).every((c) => c.officer === '王先生'),
   '承辦人篩選'
 )
+// 承辦人改為手動輸入後，篩選以「包含」比對，打幾個字就找得到
+check(
+  applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王' }).every((c) => c.officer.includes('王')),
+  '承辦人只打一個字也找得到'
+)
+check(
+  applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王' }).length ===
+    applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王先生' }).length,
+  '打部分字與打全名結果一致'
+)
+check(
+  applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: ' 王先生 ' }).length ===
+    applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王先生' }).length,
+  '前後空白不影響承辦人篩選'
+)
+check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '   ' }).length === mixed.length, '只打空白視為不篩選')
+check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '查無此人' }).length === 0, '查無承辦人時回傳空陣列')
+check(
+  applyReportFilters(
+    [{ ...mixed[0], officer: 'Alice Wang' }],
+    { ...EMPTY_REPORT_FILTERS, officer: 'alice' }
+  ).length === 1,
+  '英文承辦人不分大小寫'
+)
+check(describeFilters({ ...EMPTY_REPORT_FILTERS, officer: ' 王先生 ' }).includes('承辦人：王先生'), '條件說明去除空白')
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, stages: ['withdrawn'] }).length === 1,
   '流程階段篩選'

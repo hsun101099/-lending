@@ -181,19 +181,44 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                     </div>
 
                     <div>
-                      <label className="mb-1.5 block text-xs font-semibold text-ink-soft">承辦人</label>
-                      <select
+                      <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
+                        承辦人
+                        <span className="ml-1 font-normal text-ink-faint">留空代表全部</span>
+                      </label>
+                      <input
                         value={filters.officer}
                         onChange={(e) => setFilters((f) => ({ ...f, officer: e.target.value }))}
+                        placeholder="輸入承辦人姓名"
+                        list="report-officer-options"
+                        autoComplete="off"
                         className={fieldClass}
-                      >
-                        <option value="">全部承辦人</option>
+                      />
+                      {/* 目前資料裡出現過的承辦人，可直接點選，不用整個名字打完 */}
+                      <datalist id="report-officer-options">
                         {officerChoices.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
+                          <option key={o} value={o} />
                         ))}
-                      </select>
+                      </datalist>
+                      {officerChoices.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {officerChoices.map((o) => (
+                            <button
+                              key={o}
+                              type="button"
+                              onClick={() =>
+                                setFilters((f) => ({ ...f, officer: f.officer.trim() === o ? '' : o }))
+                              }
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-150 ${
+                                filters.officer.trim() === o
+                                  ? 'border-primary bg-blue-50 text-primary'
+                                  : 'border-slate-200 text-ink-soft hover:border-primary hover:text-primary'
+                              }`}
+                            >
+                              {o}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div>
