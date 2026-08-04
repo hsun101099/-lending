@@ -9,7 +9,6 @@ import {
   Maximize2,
   Minus,
   Plus,
-  Printer,
   RotateCcw,
   SlidersHorizontal,
   X,
@@ -117,7 +116,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
     try {
       await downloadReportPdf(previewRef.current)
     } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : '產生 PDF 失敗，請改用列印功能')
+      setDownloadError(e instanceof Error ? e.message : '產生 PDF 失敗，請稍後再試')
     } finally {
       setDownloading(false)
     }
@@ -165,7 +164,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       {step === 'filter' ? '選擇報表範圍' : '報表預覽'}
                     </h2>
                     <p className="truncate text-xs text-ink-faint">
-                      {step === 'filter' ? '步驟 1／2：設定要列入報表的案件' : '步驟 2／2：確認內容後下載或列印'}
+                      {step === 'filter' ? '步驟 1／2：設定要列入報表的案件' : '步驟 2／2：確認內容後下載 PDF'}
                     </p>
                   </div>
                 </div>
@@ -320,7 +319,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-ink-soft">版面預覽</p>
                         <p className="mt-0.5 text-[11px] text-ink-faint">
-                          實際列印／下載的 A4 橫式版面
+                          下載的 PDF 就是這個 A4 橫式版面
                           {isScrollable && <span className="text-primary">，可左右滑動</span>}
                         </p>
                       </div>
@@ -405,7 +404,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                     </div>
                   </div>
 
-                  {/* 步驟二底部：返回與輸出 */}
+                  {/* 步驟二底部：返回與下載 */}
                   <div className="print-hide shrink-0 space-y-2.5 border-t border-slate-100 px-5 py-4 sm:px-6">
                     {downloadError && (
                       <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{downloadError}</p>
@@ -418,13 +417,6 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       >
                         {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                         {downloading ? '產生中...' : '下載此 PDF 檔'}
-                      </button>
-                      <button
-                        onClick={() => window.print()}
-                        className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-ink-soft transition-colors duration-150 hover:border-primary hover:text-primary sm:flex-1"
-                      >
-                        <Printer size={16} />
-                        列印
                       </button>
                       <button
                         onClick={() => setStep('filter')}
