@@ -108,7 +108,27 @@ async function main() {
   )
   await check('已加入的同仁不受註冊碼更改影響', () => assertSucceeds(getDoc(doc(staff, 'cases/LN-1'))))
 
-  console.log('\n=== 6. 其他路徑一律拒絕 ===')
+  console.log('\n=== 6. 註冊碼被誤刪或清空時要鎖住，不能變成人人可進 ===')
+  await check('清空註冊碼', () => assertSucceeds(updateDoc(doc(staff, 'config/registration'), { code: '' })))
+  await check('註冊碼是空的時候，送空字串也進不來', () =>
+    assertFails(setDoc(doc(outsider, 'members/outsider'), { code: '' }))
+  )
+  await check('註冊碼是空的時候，送 null 也進不來', () =>
+    assertFails(setDoc(doc(outsider, 'members/outsider'), { code: null }))
+  )
+  await check('code 欄位整個不見時，送 null 也進不來', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'config/registration'), { updatedAt: 'x' })
+    })
+    await assertFails(setDoc(doc(outsider, 'members/outsider'), { code: null }))
+  })
+  await check('已經在名冊裡的同仁仍能正常使用', () => assertSucceeds(getDoc(doc(staff, 'cases/LN-1'))))
+  // 還原註冊碼，繼續後面的測試
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'config/registration'), { code: 'new-2027' })
+  })
+
+  console.log('\n=== 7. 其他路徑一律拒絕 ===')
   await check('不能寫入未定義的集合', () => assertFails(setDoc(doc(staff, 'whatever/x'), { a: 1 })))
   await check('不能把別人移出名冊', () => assertFails(deleteDoc(doc(outsider, 'members/staff'))))
   await check('可以把自己移出名冊', () => assertSucceeds(deleteDoc(doc(staff2, 'members/staff2'))))

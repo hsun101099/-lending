@@ -26,8 +26,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/config/registration).data.code;
     }
 
+    // 註冊碼必須真的是一組有內容的字串。
+    // 萬一 code 欄位被誤刪或清空，這裡會讓所有人都加不進名冊（寧可鎖住也不放行），
+    // 而不是變成「送出空值就能通過比對」。
     function codeIsSet() {
-      return exists(/databases/$(database)/documents/config/registration);
+      return exists(/databases/$(database)/documents/config/registration)
+             && registrationCode() is string
+             && registrationCode().size() >= 4;
     }
 
     // 成員名冊：只能把自己加進來，而且必須附上正確的註冊碼
