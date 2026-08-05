@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Eye, EyeOff, KeyRound, Loader2, ShieldCheck, X } from 'lucide-react'
+import { Eye, EyeOff, Loader2, ShieldCheck, X } from 'lucide-react'
+import PasswordInput from '../common/PasswordInput'
 import { changePassword, describeAuthError, MIN_PASSWORD_LENGTH, validatePassword } from '../../hooks/useAuth'
 import { describeMembershipError, getRegistrationCode, updateRegistrationCode } from '../../services/membership'
 import { MIN_CODE_LENGTH } from './JoinScreen'
@@ -222,38 +223,24 @@ export default function AccountModal({ open, onClose }: AccountModalProps) {
                     <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
                       新密碼（至少 {MIN_PASSWORD_LENGTH} 個字）
                     </label>
-                    <div className="relative">
-                      <KeyRound
-                        size={15}
-                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
-                      />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="請輸入新密碼"
-                        autoComplete="new-password"
-                        className={inputClass}
-                      />
-                    </div>
+                    <PasswordInput
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="請輸入新密碼"
+                      autoComplete="new-password"
+                      label="新密碼"
+                    />
                   </div>
 
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold text-ink-soft">再次輸入新密碼</label>
-                    <div className="relative">
-                      <KeyRound
-                        size={15}
-                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
-                      />
-                      <input
-                        type="password"
-                        value={confirm}
-                        onChange={(e) => setConfirm(e.target.value)}
-                        placeholder="再輸入一次"
-                        autoComplete="new-password"
-                        className={inputClass}
-                      />
-                    </div>
+                    <PasswordInput
+                      value={confirm}
+                      onChange={setConfirm}
+                      placeholder="再輸入一次"
+                      autoComplete="new-password"
+                      label="再次輸入新密碼"
+                    />
                   </div>
 
                   {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-danger">{error}</p>}

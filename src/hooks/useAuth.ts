@@ -33,8 +33,16 @@ export function normalizeEmployeeId(raw: string): string {
  * 信箱格式送給 Firebase；使用者不需要、也不會看到這個信箱。
  * 這同時讓 Firebase 的信箱唯一性替我們確保「同一個員編不會被兩個人使用」。
  */
-function toInternalEmail(employeeId: string): string {
-  return `u${normalizeEmployeeId(employeeId)}@loan.local`
+/**
+ * 忘記密碼時無法寄送重設信（內部信箱不是真的信箱），因此改為
+ * 用同一個員編再開一組新的內部帳號，並以「第幾代」區分。
+ * 登入時會依序嘗試，所以使用者完全感覺不到這件事。
+ */
+export const MAX_ACCOUNT_GENERATION = 3
+
+function toInternalEmail(employeeId: string, generation = 1): string {
+  const id = normalizeEmployeeId(employeeId)
+  return generation <= 1 ? `u${id}@loan.local` : `u${id}.g${generation}@loan.local`
 }
 
 /** 密碼最少需要的長度。密碼是選填的，設定了才會檢查。 */
@@ -107,11 +115,13 @@ export function validatePassword(password: string, required = false): string {
 }
 
 /** 把 Firebase 的錯誤代碼轉成使用者看得懂的訊息。 */
-export function describeAuthError(error: unknown, context: 'login' | 'register' | 'password'): string {
+export function describeAuthError(error: unknown, context: 'login' | 'register' | 'password' | 'reset'): string {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
   switch (code) {
     case 'auth/email-already-in-use':
-      return '這個員編已經建立過帳號了，請改用「登入」'
+      return context === 'reset'
+        ? '這個員編重設次數已達上限，請聯絡管理者'
+        : '這個員編已經建立過帳號了，請改用「登入」；忘記密碼請點下方的「忘記密碼」'
     case 'auth/invalid-email':
       return '員編格式不正確，請只輸入英文、數字或連字號'
     case 'auth/weak-password':
@@ -134,22 +144,34 @@ export function describeAuthError(error: unknown, context: 'login' | 'register' 
       return '尚未在 Firebase 啟用「電子郵件/密碼」登入方式'
     default:
       if (context === 'login') return '登入失敗，請稍後再試'
-      return context === 'register' ? '建立帳號失敗，請稍後再試' : '設定密碼失敗，請稍後再試'
+      if (context === 'register') return '建立帳號失敗，請稍後再試'
+      return context === 'reset' ? '重設密碼失敗，請稍後再試' : '設定密碼失敗，請稍後再試'
   }
 }
 
 export async function loginWithEmployeeId(employeeId: string, password = ''): Promise<void> {
   const auth = getFirebaseAuth()
-  const email = toInternalEmail(employeeId)
   const id = normalizeEmployeeId(employeeId)
   const secret = resolveSecret(employeeId, password)
-  try {
-    await signInWithEmailAndPassword(auth, email, toInternalPassword(secret))
-  } catch (error) {
-    // 早期版本直接以輸入的數字本身作為密碼，這裡讓當時建立的帳號仍可登入
-    if (!isCredentialError(error) || password.trim() || id.length < 6) throw error
-    await signInWithEmailAndPassword(auth, email, id)
+  let lastError: unknown = null
+
+  // 重設過密碼的人帳號會在較新的一代，因此逐代嘗試
+  for (let generation = 1; generation <= MAX_ACCOUNT_GENERATION; generation++) {
+    try {
+      await signInWithEmailAndPassword(auth, toInternalEmail(id, generation), toInternalPassword(secret))
+      return
+    } catch (error) {
+      if (!isCredentialError(error)) throw error
+      lastError = error
+    }
   }
+
+  // 早期版本直接以輸入的數字本身作為密碼，這裡讓當時建立的帳號仍可登入
+  if (!password.trim() && id.length >= 6) {
+    await signInWithEmailAndPassword(auth, toInternalEmail(id), id)
+    return
+  }
+  throw lastError
 }
 
 export async function registerWithEmployeeId(
@@ -166,16 +188,56 @@ export async function registerWithEmployeeId(
   return credential.user
 }
 
+/**
+ * 忘記密碼：以同一個員編開一組新的內部帳號並設定新密碼。
+ *
+ * 內部信箱不是真的信箱，寄不了重設信，因此改用「單位註冊碼」驗證身分——
+ * 呼叫端建立帳號後必須立刻用註冊碼加入名冊，註冊碼不對就把帳號收回。
+ *
+ * 注意：舊的那一代帳號仍留在 Firebase，知道舊密碼的人還是進得去。
+ * 前端無法刪除別的帳號，真要停用得由管理者到 Firebase Console 刪除，
+ * 因此畫面上不宣稱「舊密碼會失效」。
+ */
+export async function resetPasswordWithNewAccount(
+  name: string,
+  employeeId: string,
+  newPassword: string
+): Promise<User> {
+  const auth = getFirebaseAuth()
+  const id = normalizeEmployeeId(employeeId)
+  let lastError: unknown = null
+
+  for (let generation = 2; generation <= MAX_ACCOUNT_GENERATION; generation++) {
+    try {
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        toInternalEmail(id, generation),
+        toInternalPassword(resolveSecret(id, newPassword))
+      )
+      await updateProfile(credential.user, { displayName: name })
+      return credential.user
+    } catch (error) {
+      const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
+      if (code !== 'auth/email-already-in-use') throw error
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
 /** 註冊碼不對時把剛建立的帳號收回，避免留下一堆進不去的空帳號。 */
 export async function discardCurrentAccount(): Promise<void> {
   const user = getFirebaseAuth().currentUser
   if (user) await deleteUser(user)
 }
 
-/** 從登入中的帳號取回員編（內部信箱格式為 u{員編}@loan.local）。 */
+/**
+ * 從登入中的帳號取回員編。
+ * 內部信箱格式為 u{員編}@loan.local；重設過密碼的帳號會多一段 .g2，要一併去掉。
+ */
 export function getEmployeeId(user: User | null): string {
   const email = user?.email ?? ''
-  const match = /^u(.+)@loan\.local$/.exec(email)
+  const match = /^u(.+?)(?:\.g\d+)?@loan\.local$/.exec(email)
   return match ? match[1] : ''
 }
 

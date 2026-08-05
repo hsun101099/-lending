@@ -33,6 +33,7 @@ import { compareCaseIdDesc, isLegacyCaseId } from '../src/utils/caseId'
 import { needsRenumber, planRenumber } from '../src/utils/renumberCases'
 import {
   getEmployeeId,
+  MAX_ACCOUNT_GENERATION,
   normalizeEmployeeId,
   resolveSecret,
   validateEmployeeId,
@@ -598,6 +599,11 @@ console.log('=== 15. 密碼 ===')
 
   check(getEmployeeId({ email: 'ua1234@loan.local' } as never) === 'a1234', '可從帳號取回員編')
   check(getEmployeeId(null) === '', '未登入時取不到員編')
+  // 重設過密碼的帳號信箱會多一段 .g2，員編要還原成原本的
+  check(getEmployeeId({ email: 'ua1234.g2@loan.local' } as never) === 'a1234', '重設過密碼仍取得同一個員編')
+  check(getEmployeeId({ email: 'u1234.g3@loan.local' } as never) === '1234', '數字員編重設後也一致')
+  check(getEmployeeId({ email: 'ua-12.g2@loan.local' } as never) === 'a-12', '含連字號的員編不受影響')
+  check(MAX_ACCOUNT_GENERATION >= 2, '至少允許重設一次密碼')
 }
 
 console.log(`\n${failures === 0 ? '✅ 全部通過' : '❌ 有失敗項目'}：${checks - failures}/${checks} 項檢查通過\n`)
