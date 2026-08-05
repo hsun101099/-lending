@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, Tags, User, X, XCircle, ArrowUpCircle, Trash2, Undo2 } from 'lucide-react'
-import type { LoanCase } from '../../types'
+import type { LoanCase, StageKey } from '../../types'
 import { formatWan, formatDate } from '../../utils/format'
 import { describeDeletedAt, isDeleted } from '../../utils/recycleBin'
 import StatusBadge from '../table/StatusBadge'
@@ -19,6 +19,9 @@ interface CaseDrawerProps {
   onUpdateRemarks: (id: string, remarks: string) => void
   onDelete: (loanCase: LoanCase) => void
   onRestore: (loanCase: LoanCase) => void
+  onChangeStepDate: (id: string, key: StageKey, date: string) => void
+  onAddStepNote: (id: string, key: StageKey, note: string) => void
+  onRemoveStepNote: (id: string, key: StageKey, index: number) => void
 }
 
 export default function CaseDrawer({
@@ -29,6 +32,9 @@ export default function CaseDrawer({
   onUpdateRemarks,
   onDelete,
   onRestore,
+  onChangeStepDate,
+  onAddStepNote,
+  onRemoveStepNote,
 }: CaseDrawerProps) {
   const [remarksDraft, setRemarksDraft] = useState('')
 
@@ -50,7 +56,7 @@ export default function CaseDrawer({
         { icon: Briefcase, label: '貸款種類', value: loanCase.loanType },
         { icon: Tags, label: '類別', value: loanCase.category || '—' },
         { icon: Hash, label: '案件編號', value: loanCase.id },
-        { icon: User, label: '承辦人', value: loanCase.officer },
+        { icon: User, label: '受理人', value: loanCase.officer },
         { icon: CalendarDays, label: '建立日期', value: formatDate(loanCase.createdDate) },
       ]
     : []
@@ -147,8 +153,17 @@ export default function CaseDrawer({
                 />
               </div>
 
-              <h3 className="mb-4 text-sm font-bold text-ink">案件流程時間軸</h3>
-              <Timeline steps={loanCase.timeline} />
+              <div className="mb-4 flex items-baseline justify-between gap-2">
+                <h3 className="text-sm font-bold text-ink">案件流程時間軸</h3>
+                {!deleted && <span className="text-[11px] text-ink-faint">點開任一關可修改日期、加備註</span>}
+              </div>
+              <Timeline
+                steps={loanCase.timeline}
+                editable={!deleted}
+                onChangeDate={(key, date) => onChangeStepDate(loanCase.id, key, date)}
+                onAddNote={(key, note) => onAddStepNote(loanCase.id, key, note)}
+                onRemoveNote={(key, index) => onRemoveStepNote(loanCase.id, key, index)}
+              />
 
               <div className="mt-2">
                 <h3 className="mb-2 text-sm font-bold text-ink">備註區</h3>

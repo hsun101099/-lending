@@ -10,7 +10,7 @@ interface PrintableReportProps {
   filters: ReportFilters
 }
 
-const COLUMNS = ['案件編號', '客戶姓名', '貸款金額', '類別', '貸款種類', '承辦人', '建立日期', '目前流程', '進度', '備註']
+const COLUMNS = ['案件編號', '客戶姓名', '貸款金額', '類別', '貸款種類', '受理人', '建立日期', '目前流程', '進度', '備註']
 
 /** 首頁需容納統計摘要，可放的明細列數較少。 */
 const FIRST_PAGE_ROWS = 12

@@ -13,7 +13,7 @@ export default function SearchBar({ value, onChange, placeholder }: SearchBarPro
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? '搜尋客戶姓名、金額、承辦人、案件編號...'}
+        placeholder={placeholder ?? '搜尋客戶姓名、金額、受理人、案件編號...'}
         className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm text-ink placeholder:text-ink-faint transition-all duration-200 focus:border-primary focus:outline-none focus:ring-4 focus:ring-blue-100"
       />
       {value && (

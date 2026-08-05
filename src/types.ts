@@ -31,7 +31,10 @@ export interface TimelineStep {
   status: TimelineStatus
   completedDate?: string
   officer?: string
+  /** 舊版的單則備註，讀取時會併入 notes */
   note?: string
+  /** 這一關的備註，可累加多則，也可個別刪除 */
+  notes?: string[]
   attachments?: number
   description?: string
 }

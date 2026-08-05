@@ -26,6 +26,8 @@ const emptyForm = {
   createdDate: getTodayIso(),
   remarks: '',
   currentStage: 'intake' as StageKey,
+  /** 補登舊案件時，每一關可各自填日期；沒填就沿用建立日期 */
+  stageDates: {} as Partial<Record<StageKey, string>>,
 }
 
 export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalProps) {
@@ -42,8 +44,13 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
   }
   const isValid = !Object.values(errors).some(Boolean)
 
+  // 選到的階段之前的關卡都算已完成，這些關卡可以各自指定日期
+  const currentIdx = STAGE_ORDER.indexOf(form.currentStage)
+  const completedStages =
+    form.currentStage === 'disbursement' ? STAGE_ORDER : STAGE_ORDER.slice(0, currentIdx)
+
   function reset() {
-    setForm({ ...emptyForm, createdDate: getTodayIso() })
+    setForm({ ...emptyForm, createdDate: getTodayIso(), stageDates: {} })
     setTouched(false)
   }
 
@@ -65,6 +72,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
       createdDate: form.createdDate,
       remarks: form.remarks.trim(),
       currentStage: form.currentStage,
+      stageDates: form.stageDates,
     })
     reset()
   }
@@ -193,7 +201,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
-                      <User size={12} /> 承辦人
+                      <User size={12} /> 受理人
                     </label>
                     <input
                       value={form.officer}
@@ -201,7 +209,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                       placeholder="例如：王先生"
                       className={inputClass(errors.officer)}
                     />
-                    {touched && errors.officer && <p className="mt-1 text-xs text-danger">請輸入承辦人</p>}
+                    {touched && errors.officer && <p className="mt-1 text-xs text-danger">請輸入受理人</p>}
                   </div>
 
                   <div>
@@ -265,10 +273,35 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                       )
                     })}
                   </div>
-                  {STAGE_ORDER.indexOf(form.currentStage) > 0 && (
-                    <p className="mt-2 text-[11px] text-ink-faint">
-                      建立後，第 1～{STAGE_ORDER.indexOf(form.currentStage)} 關會自動標記為已完成
-                    </p>
+                  {completedStages.length > 0 && (
+                    <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                      <p className="text-[11px] font-semibold text-ink-soft">
+                        已完成關卡的日期
+                        <span className="ml-1 font-normal text-ink-faint">不填就沿用建立日期</span>
+                      </p>
+                      {/* 補登去年的舊案件時，每一關的日期都要能自己填 */}
+                      <div className="mt-2 space-y-1.5">
+                        {completedStages.map((stage, i) => (
+                          <div key={stage} className="flex items-center gap-2">
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[9px] font-bold leading-none tabular-nums text-primary">
+                              {i + 1}
+                            </span>
+                            <span className="w-20 shrink-0 truncate text-xs text-ink-soft">
+                              {STAGE_CONFIG[stage].label}
+                            </span>
+                            <input
+                              type="date"
+                              value={form.stageDates[stage] ?? ''}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, stageDates: { ...f.stageDates, [stage]: e.target.value } }))
+                              }
+                              aria-label={`${STAGE_CONFIG[stage].label} 完成日期`}
+                              className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
 

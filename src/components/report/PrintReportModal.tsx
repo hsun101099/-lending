@@ -59,7 +59,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
   const totalAmount = filteredCases.reduce((sum, c) => sum + c.loanAmount, 0)
   const overdueCount = filteredCases.filter(isOverdue).length
 
-  // 承辦人為自由輸入，選單直接取自實際資料，只列出真的存在的承辦人
+  // 受理人為自由輸入，選單直接取自實際資料，只列出真的存在的受理人
   const officerChoices = useMemo(
     () => Array.from(new Set(cases.map((c) => c.officer).filter(Boolean))).sort(),
     [cases]
@@ -215,18 +215,18 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
 
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-ink-soft">
-                        承辦人
+                        受理人
                         <span className="ml-1 font-normal text-ink-faint">留空代表全部</span>
                       </label>
                       <input
                         value={filters.officer}
                         onChange={(e) => setFilters((f) => ({ ...f, officer: e.target.value }))}
-                        placeholder="輸入承辦人姓名"
+                        placeholder="輸入受理人姓名"
                         list="report-officer-options"
                         autoComplete="off"
                         className={fieldClass}
                       />
-                      {/* 目前資料裡出現過的承辦人，可直接點選，不用整個名字打完 */}
+                      {/* 目前資料裡出現過的受理人，可直接點選，不用整個名字打完 */}
                       <datalist id="report-officer-options">
                         {officerChoices.map((o) => (
                           <option key={o} value={o} />

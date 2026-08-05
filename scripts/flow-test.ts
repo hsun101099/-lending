@@ -8,12 +8,21 @@
 import { STAGE_ORDER, STAGE_CONFIG, ALL_FILTER_STAGES, stageProgress } from '../src/data/stages'
 import { LOAN_TYPE_OPTIONS } from '../src/data/loanTypes'
 import { CATEGORY_OPTIONS } from '../src/data/categories'
-import { buildCase, advanceStage, withdrawCase, type NewCaseInput } from '../src/utils/caseActions'
+import {
+  buildCase,
+  advanceStage,
+  withdrawCase,
+  addStepNote,
+  removeStepNote,
+  updateTimelineStep,
+  type NewCaseInput,
+} from '../src/utils/caseActions'
 import { normalizeCase } from '../src/utils/normalizeCase'
 import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS } from '../src/utils/reportFilters'
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
 import { formatWan, wanToNt, formatDate } from '../src/utils/format'
 import { describeDeletedAt, isDeleted, partitionCases } from '../src/utils/recycleBin'
+import { compareCaseIdDesc, isLegacyCaseId } from '../src/utils/caseId'
 import {
   getEmployeeId,
   normalizeEmployeeId,
@@ -202,12 +211,12 @@ check(getMonthlyNewCaseSeries(mixed, new Date('2026-07-15T10:00:00')).length ===
 check(applyReportFilters(mixed, EMPTY_REPORT_FILTERS).length === mixed.length, '空條件回傳全部')
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王先生' }).every((c) => c.officer === '王先生'),
-  '承辦人篩選'
+  '受理人篩選'
 )
-// 承辦人改為手動輸入後，篩選以「包含」比對，打幾個字就找得到
+// 受理人改為手動輸入後，篩選以「包含」比對，打幾個字就找得到
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王' }).every((c) => c.officer.includes('王')),
-  '承辦人只打一個字也找得到'
+  '受理人只打一個字也找得到'
 )
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王' }).length ===
@@ -217,18 +226,18 @@ check(
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: ' 王先生 ' }).length ===
     applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '王先生' }).length,
-  '前後空白不影響承辦人篩選'
+  '前後空白不影響受理人篩選'
 )
 check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '   ' }).length === mixed.length, '只打空白視為不篩選')
-check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '查無此人' }).length === 0, '查無承辦人時回傳空陣列')
+check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, officer: '查無此人' }).length === 0, '查無受理人時回傳空陣列')
 check(
   applyReportFilters(
     [{ ...mixed[0], officer: 'Alice Wang' }],
     { ...EMPTY_REPORT_FILTERS, officer: 'alice' }
   ).length === 1,
-  '英文承辦人不分大小寫'
+  '英文受理人不分大小寫'
 )
-check(describeFilters({ ...EMPTY_REPORT_FILTERS, officer: ' 王先生 ' }).includes('承辦人：王先生'), '條件說明去除空白')
+check(describeFilters({ ...EMPTY_REPORT_FILTERS, officer: ' 王先生 ' }).includes('受理人：王先生'), '條件說明去除空白')
 check(
   applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, stages: ['withdrawn'] }).length === 1,
   '流程階段篩選'
@@ -237,7 +246,7 @@ const ranged = applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, dateFrom: '2
 check(ranged.every((c) => c.createdDate >= '2026-07-05' && c.createdDate <= '2026-07-10'), '日期區間篩選')
 check(applyReportFilters(mixed, { ...EMPTY_REPORT_FILTERS, dateFrom: '2027-01-01' }).length === 0, '無符合時回傳空陣列')
 check(describeFilters(EMPTY_REPORT_FILTERS).includes('全部'), '無條件時的說明文字')
-check(describeFilters({ ...EMPTY_REPORT_FILTERS, officer: '王先生' }).includes('王先生'), '條件說明含承辦人')
+check(describeFilters({ ...EMPTY_REPORT_FILTERS, officer: '王先生' }).includes('王先生'), '條件說明含受理人')
 
 console.log('=== 6. 顯示格式 ===')
 check(formatWan(60_000_000) === '6,000萬', '金額轉萬（含千分位）', formatWan(60_000_000))
@@ -306,7 +315,110 @@ console.log('=== 8. 員編登入 ===')
   check(validateEmployeeId('a b@c') !== '', '含特殊符號不通過')
 }
 
-console.log('=== 9. 密碼 ===')
+console.log('=== 9. 補登舊案件：每一關可自己填日期 ===')
+{
+  const old = buildCase(
+    {
+      ...makeInput(0, 'contract'),
+      createdDate: '2025-03-10',
+      stageDates: {
+        intake: '2025-03-10',
+        appraisal: '2025-03-18',
+        credit: '2025-04-02',
+        approval: '2025-04-20',
+        headOffice: '2025-05-06',
+        creditReview: '2025-05-30',
+      },
+    },
+    '7'
+  )
+  const byKey = new Map(old.timeline.map((s) => [s.key, s]))
+  check(byKey.get('intake')?.completedDate === '2025-03-10', '受理日期依填寫值', byKey.get('intake')?.completedDate)
+  check(byKey.get('credit')?.completedDate === '2025-04-02', '徵信日期依填寫值', byKey.get('credit')?.completedDate)
+  check(
+    byKey.get('creditReview')?.completedDate === '2025-05-30',
+    '授管室書審日期依填寫值',
+    byKey.get('creditReview')?.completedDate
+  )
+  check(byKey.get('contract')?.status === 'current', '選到的那一關為進行中')
+  check(old.lastUpdated === '2025-05-30', '最後異動日取最後一關的日期', old.lastUpdated)
+
+  const partial = buildCase({ ...makeInput(1, 'credit'), createdDate: '2025-01-05', stageDates: { appraisal: '2025-02-02' } }, '8')
+  const partialByKey = new Map(partial.timeline.map((s) => [s.key, s]))
+  check(partialByKey.get('intake')?.completedDate === '2025-01-05', '沒填的關卡沿用建立日期')
+  check(partialByKey.get('appraisal')?.completedDate === '2025-02-02', '有填的關卡用填寫的日期')
+  check(findUndefinedPaths(partial).length === 0, '補登的案件可安全寫入 Firestore')
+
+  // 事後在時間軸上修正日期
+  const fixed = updateTimelineStep(partial, 'appraisal', { completedDate: '2025-02-10' })
+  check(
+    fixed.timeline.find((s) => s.key === 'appraisal')?.completedDate === '2025-02-10',
+    '事後可修改單一關卡的日期'
+  )
+  const cleared = updateTimelineStep(fixed, 'appraisal', { completedDate: '' })
+  check(cleared.timeline.find((s) => s.key === 'appraisal')?.completedDate === undefined, '清空日期不會留下空字串')
+  check(findUndefinedPaths(cleared).length === 0, '修改日期後可安全寫入 Firestore')
+}
+
+console.log('=== 10. 流程備註：可累加、可個別刪除 ===')
+{
+  let c = buildCase(makeInput(2, 'credit'), '9')
+  c = addStepNote(c, 'credit', '客戶補寄薪轉證明')
+  check(c.timeline.find((s) => s.key === 'credit')?.notes?.length === 1, '新增第一則備註')
+
+  c = addStepNote(c, 'credit', '聯徵已調閱')
+  const notes = c.timeline.find((s) => s.key === 'credit')?.notes ?? []
+  check(notes.length === 2, '再新增一則時保留原有備註', String(notes.length))
+  check(notes[0] === '客戶補寄薪轉證明' && notes[1] === '聯徵已調閱', '備註依新增順序排列')
+
+  c = addStepNote(c, 'intake', '臨櫃收件')
+  check(c.timeline.find((s) => s.key === 'intake')?.notes?.length === 1, '不同關卡的備註各自獨立')
+  check(c.timeline.find((s) => s.key === 'credit')?.notes?.length === 2, '新增別關備註不影響原本那關')
+
+  c = addStepNote(c, 'credit', '   ')
+  check(c.timeline.find((s) => s.key === 'credit')?.notes?.length === 2, '只打空白不會新增備註')
+
+  c = roundTrip(c, '含備註的案件')
+  check(c.timeline.find((s) => s.key === 'credit')?.notes?.length === 2, '存檔讀回後備註仍在')
+
+  c = removeStepNote(c, 'credit', 0)
+  const left = c.timeline.find((s) => s.key === 'credit')?.notes ?? []
+  check(left.length === 1 && left[0] === '聯徵已調閱', '刪除指定的那一則，其餘保留')
+
+  c = removeStepNote(c, 'credit', 0)
+  check(c.timeline.find((s) => s.key === 'credit')?.notes === undefined, '刪光後不留下空陣列')
+  check(findUndefinedPaths(c).length === 0, '刪除備註後可安全寫入 Firestore')
+
+  // 舊資料的單則備註（note）要併進新的備註清單
+  const legacyNote = normalizeCase({
+    ...buildCase(makeInput(3, 'credit'), '10'),
+    timeline: buildCase(makeInput(3, 'credit'), '10').timeline.map((s) =>
+      s.key === 'credit' ? { ...s, note: '舊版留下的備註' } : s
+    ),
+  })
+  check(
+    legacyNote.timeline.find((s) => s.key === 'credit')?.notes?.[0] === '舊版留下的備註',
+    '舊版的單則備註會併入新清單'
+  )
+  check(findUndefinedPaths(legacyNote).length === 0, '併入後可安全寫入 Firestore')
+}
+
+console.log('=== 11. 案件編號 1、2、3 ===')
+{
+  check(!isLegacyCaseId('1') && !isLegacyCaseId('42'), '純數字為新編號')
+  check(isLegacyCaseId('LN-2026-1005'), '舊格式仍可辨識')
+
+  const ids = ['LN-2026-1002', '2', 'LN-2026-1005', '10', '1']
+  const sorted = [...ids].sort(compareCaseIdDesc)
+  check(
+    JSON.stringify(sorted) === JSON.stringify(['10', '2', '1', 'LN-2026-1005', 'LN-2026-1002']),
+    '新編號由大到小在前，舊編號排在後面',
+    sorted.join(', ')
+  )
+  check(compareCaseIdDesc('10', '9') < 0, '10 排在 9 前面（不是字串比大小）')
+}
+
+console.log('=== 12. 密碼 ===')
 {
   // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
   check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))

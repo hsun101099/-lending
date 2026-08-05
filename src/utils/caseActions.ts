@@ -1,6 +1,6 @@
 import { STAGE_CONFIG, STAGE_ORDER, stageProgress } from '../data/stages'
 import { getTodayIso } from './today'
-import type { LoanCase, StageKey } from '../types'
+import type { LoanCase, StageKey, TimelineStep } from '../types'
 
 export interface NewCaseInput {
   customerName: string
@@ -11,6 +11,13 @@ export interface NewCaseInput {
   createdDate: string
   remarks: string
   currentStage: StageKey
+  /** 各階段的完成日期。補登舊案件時可逐關填寫，未填則沿用建立日期 */
+  stageDates?: Partial<Record<StageKey, string>>
+}
+
+/** 移除值為 undefined 或空字串的欄位（Firestore 不接受 undefined）。 */
+function clean<T extends object>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== '')) as T
 }
 
 /** 依登打內容組出一筆完整案件；案件編號由呼叫端（資料層）配發。 */
@@ -18,6 +25,7 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
   const currentIdx = STAGE_ORDER.indexOf(input.currentStage)
   const isFullyDone = input.currentStage === 'disbursement'
   const completedCount = isFullyDone ? STAGE_ORDER.length : currentIdx
+  const dateOf = (key: StageKey) => input.stageDates?.[key]?.trim() || input.createdDate
 
   const timeline = STAGE_ORDER.map((key, i) => {
     const cfg = STAGE_CONFIG[key]
@@ -26,7 +34,7 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
         key,
         label: cfg.label,
         status: 'completed' as const,
-        completedDate: input.createdDate,
+        completedDate: dateOf(key),
         officer: input.officer,
         description: `${cfg.label}作業已完成，資料已歸檔存查。`,
       }
@@ -37,7 +45,7 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
         label: cfg.label,
         status: 'current' as const,
         officer: input.officer,
-        description: `${cfg.label}進行中，${input.officer}承辦處理。`,
+        description: `${cfg.label}進行中，${input.officer}受理處理。`,
       }
     }
     return {
@@ -47,6 +55,13 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
       description: `尚未進入${cfg.label}階段。`,
     }
   })
+
+  // 補登舊案件時，最後異動日應是最後一關的日期，逾期提醒才會準確
+  const lastUpdated = timeline
+    .map((s) => s.completedDate)
+    .filter((d): d is string => !!d)
+    .concat(input.createdDate)
+    .reduce((latest, d) => (d > latest ? d : latest), input.createdDate)
 
   return {
     id,
@@ -58,7 +73,7 @@ export function buildCase(input: NewCaseInput, id: string): LoanCase {
     createdDate: input.createdDate,
     currentStage: input.currentStage,
     progress: stageProgress(input.currentStage),
-    lastUpdated: getTodayIso(),
+    lastUpdated,
     remarks: input.remarks,
     timeline,
   }
@@ -90,7 +105,7 @@ export function advanceStage(loanCase: LoanCase): LoanCase {
             ...step,
             status: 'current' as const,
             officer: step.officer ?? loanCase.officer,
-            description: `${STAGE_CONFIG[nextStage].label}進行中，${loanCase.officer}承辦處理。`,
+            description: `${STAGE_CONFIG[nextStage].label}進行中，${loanCase.officer}受理處理。`,
           }
     }
     return step
@@ -121,7 +136,6 @@ export function withdrawCase(loanCase: LoanCase): LoanCase {
       status: 'withdrawn' as const,
       completedDate: today,
       officer: loanCase.officer,
-      note: '案件已撤件，流程終止。',
       attachments: 0,
       description: '案件已撤件，流程終止。',
     },
@@ -133,4 +147,34 @@ export function withdrawCase(loanCase: LoanCase): LoanCase {
     lastUpdated: today,
     timeline,
   }
+}
+
+/** 更新某一關的資料（例如補上正確的完成日期）。 */
+export function updateTimelineStep(
+  loanCase: LoanCase,
+  key: StageKey,
+  patch: Partial<TimelineStep>
+): LoanCase {
+  const timeline = loanCase.timeline.map((step) => (step.key === key ? clean({ ...step, ...patch }) : step))
+  return { ...loanCase, timeline, lastUpdated: getTodayIso() }
+}
+
+/** 在某一關新增一則備註，原有的備註都會保留。 */
+export function addStepNote(loanCase: LoanCase, key: StageKey, note: string): LoanCase {
+  const text = note.trim()
+  if (!text) return loanCase
+  const timeline = loanCase.timeline.map((step) =>
+    step.key === key ? clean({ ...step, note: undefined, notes: [...(step.notes ?? []), text] }) : step
+  )
+  return { ...loanCase, timeline, lastUpdated: getTodayIso() }
+}
+
+/** 刪除某一關的第 index 則備註。 */
+export function removeStepNote(loanCase: LoanCase, key: StageKey, index: number): LoanCase {
+  const timeline = loanCase.timeline.map((step) => {
+    if (step.key !== key) return step
+    const notes = (step.notes ?? []).filter((_, i) => i !== index)
+    return clean({ ...step, note: undefined, notes: notes.length > 0 ? notes : undefined })
+  })
+  return { ...loanCase, timeline, lastUpdated: getTodayIso() }
 }

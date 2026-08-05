@@ -16,7 +16,14 @@ import AccountModal from './components/auth/AccountModal'
 import PrintReportModal from './components/report/PrintReportModal'
 import DeletedCasesPanel from './components/trash/DeletedCasesPanel'
 import { ALL_FILTER_STAGES } from './data/stages'
-import { advanceStage, withdrawCase, type NewCaseInput } from './utils/caseActions'
+import {
+  addStepNote,
+  advanceStage,
+  removeStepNote,
+  updateTimelineStep,
+  withdrawCase,
+  type NewCaseInput,
+} from './utils/caseActions'
 import { partitionCases } from './utils/recycleBin'
 import { isFirebaseConfigured } from './services/firebaseConfig'
 import { logout, useAuth } from './hooks/useAuth'
@@ -30,7 +37,7 @@ import {
   softDeleteCase,
   subscribeToCases,
 } from './services/caseRepository'
-import type { LoanCase } from './types'
+import type { LoanCase, StageKey } from './types'
 
 // 主管報表含多張圖表，體積較大且非進站首屏，改為切換到該頁時才載入。
 const ManagerPanel = lazy(() => import('./components/dashboard/ManagerPanel'))
@@ -188,9 +195,27 @@ function App() {
     }
   }
 
+  /** 時間軸上的修改（日期、備註）都會存回同一筆案件。 */
+  function editCase(id: string, edit: (target: LoanCase) => LoanCase, action: string) {
+    const target = cases.find((c) => c.id === id)
+    if (target) saveCase(edit(target)).catch((e) => reportFailure(action, e))
+  }
+
   function handleCreateCase(input: NewCaseInput) {
     setNewCaseOpen(false)
     createCase(input).catch((e) => reportFailure('建立案件', e))
+  }
+
+  function handleChangeStepDate(id: string, key: StageKey, date: string) {
+    editCase(id, (c) => updateTimelineStep(c, key, { completedDate: date }), '修改流程日期')
+  }
+
+  function handleAddStepNote(id: string, key: StageKey, note: string) {
+    editCase(id, (c) => addStepNote(c, key, note), '新增備註')
+  }
+
+  function handleRemoveStepNote(id: string, key: StageKey, index: number) {
+    editCase(id, (c) => removeStepNote(c, key, index), '刪除備註')
   }
 
   function handleConfirmDelete() {
@@ -438,6 +463,9 @@ function App() {
         onUpdateRemarks={handleUpdateRemarks}
         onDelete={setPendingDelete}
         onRestore={handleRestore}
+        onChangeStepDate={handleChangeStepDate}
+        onAddStepNote={handleAddStepNote}
+        onRemoveStepNote={handleRemoveStepNote}
       />
 
       <NewCaseModal open={isNewCaseOpen} onClose={() => setNewCaseOpen(false)} onCreate={handleCreateCase} />

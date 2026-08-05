@@ -6,7 +6,7 @@ import type { LoanCase, TimelineStep } from '../types'
  *
  * 流程階段擴充後（新增總社批示、授管室書審、用印、設定、核定），
  * 先前建立的案件時間軸只涵蓋舊的階段，直接顯示會缺漏。
- * 這裡以現行流程重建時間軸，並保留原有的完成日期、承辦人與備註。
+ * 這裡以現行流程重建時間軸，並保留原有的完成日期、受理人與備註。
  */
 /**
  * 移除值為 undefined 的欄位。
@@ -14,6 +14,17 @@ import type { LoanCase, TimelineStep } from '../types'
  */
 function omitUndefined<T extends object>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T
+}
+
+/**
+ * 備註早期是單一欄位（note），現在改為可累加多則的 notes。
+ * 讀取時把舊的那一則併進來，使用者不會覺得備註不見了。
+ */
+function mergeNotes(step: TimelineStep | undefined): string[] | undefined {
+  const notes = [...(step?.note ? [step.note] : []), ...(step?.notes ?? [])]
+    .map((n) => n.trim())
+    .filter(Boolean)
+  return notes.length > 0 ? Array.from(new Set(notes)) : undefined
 }
 
 export function normalizeCase(loanCase: LoanCase): LoanCase {
@@ -36,7 +47,7 @@ export function normalizeCase(loanCase: LoanCase): LoanCase {
       key,
       label: cfg.label,
       officer: prev?.officer,
-      note: prev?.note,
+      notes: mergeNotes(prev),
       attachments: prev?.attachments,
       completedDate: prev?.completedDate,
     })
@@ -67,15 +78,17 @@ export function normalizeCase(loanCase: LoanCase): LoanCase {
 
   if (isWithdrawn) {
     const prev = existing.get('withdrawn')
-    timeline.push({
-      key: 'withdrawn',
-      label: '撤件',
-      status: 'withdrawn',
-      completedDate: prev?.completedDate ?? loanCase.lastUpdated,
-      officer: prev?.officer ?? loanCase.officer,
-      note: prev?.note ?? '案件已撤件，流程終止。',
-      description: prev?.description ?? '案件已撤件，流程終止。',
-    })
+    timeline.push(
+      omitUndefined({
+        key: 'withdrawn' as const,
+        label: '撤件',
+        status: 'withdrawn' as const,
+        completedDate: prev?.completedDate ?? loanCase.lastUpdated,
+        officer: prev?.officer ?? loanCase.officer,
+        notes: mergeNotes(prev),
+        description: prev?.description ?? '案件已撤件，流程終止。',
+      })
+    )
   }
 
   return omitUndefined({

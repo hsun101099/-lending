@@ -22,7 +22,7 @@ export function isOverdue(loanCase: LoanCase): boolean {
   return daysSince(loanCase.lastUpdated, getToday()) > OVERDUE_THRESHOLD
 }
 
-const columns = ['客戶姓名', '貸款金額', '類別', '貸款種類', '承辦人', '建立日期', '目前流程', '案件狀態', '操作']
+const columns = ['客戶姓名', '貸款金額', '類別', '貸款種類', '受理人', '建立日期', '目前流程', '案件狀態', '操作']
 
 export default function LoanTable({ cases, onSelect, hasAnyCases = true, onAddCase, onDelete }: LoanTableProps) {
   if (cases.length === 0) {

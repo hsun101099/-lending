@@ -12,23 +12,25 @@ import {
 import { getDb } from './firebase'
 import { buildCase, type NewCaseInput } from '../utils/caseActions'
 import { normalizeCase } from '../utils/normalizeCase'
+import { compareCaseIdDesc } from '../utils/caseId'
 import type { LoanCase } from '../types'
 
 const CASES = 'cases'
 const COUNTERS = 'counters'
+/** 編號改為單純的流水號 1、2、3……，這個計數器與早期的 LN-年份-編號 分開計算 */
+const CASE_NO_COUNTER = 'caseNo'
 
 /** 案件編號由後端計數器配發，確保多人同時新增也不會拿到重複編號。 */
 async function allocateCaseId(): Promise<string> {
   const db = getDb()
-  const year = new Date().getFullYear()
-  const counterRef = doc(db, COUNTERS, `caseId-${year}`)
+  const counterRef = doc(db, COUNTERS, CASE_NO_COUNTER)
 
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(counterRef)
-    const current = snap.exists() ? (snap.data().value as number) : 1000
+    const current = snap.exists() ? (snap.data().value as number) : 0
     const next = current + 1
     tx.set(counterRef, { value: next }, { merge: true })
-    return `LN-${year}-${next}`
+    return String(next)
   })
 }
 
@@ -46,8 +48,8 @@ export function subscribeToCases(
       const cases = snapshot.docs.map((d) =>
         normalizeCase({ ...(d.data() as Omit<LoanCase, 'id'>), id: d.id })
       )
-      // 編號遞增，因此反向排序即為最新在前
-      cases.sort((a, b) => b.id.localeCompare(a.id))
+      // 編號遞增，因此由大到小排序即為最新在前
+      cases.sort((a, b) => compareCaseIdDesc(a.id, b.id))
       onData(cases)
     },
     (error) => onError(error)

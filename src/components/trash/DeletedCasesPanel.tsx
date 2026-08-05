@@ -50,7 +50,7 @@ export default function DeletedCasesPanel({ cases, onRestore, onPurge, onSelect 
                   <StatusBadge stage={loanCase.currentStage} />
                 </div>
                 <p className="mt-1 text-xs text-ink-faint">
-                  {loanCase.id}．{formatWan(loanCase.loanAmount)}．{loanCase.loanType}．承辦 {loanCase.officer}．
+                  {loanCase.id}．{formatWan(loanCase.loanAmount)}．{loanCase.loanType}．受理 {loanCase.officer}．
                   建立於 {formatDate(loanCase.createdDate)}
                 </p>
                 <p className="mt-0.5 text-xs text-danger">
