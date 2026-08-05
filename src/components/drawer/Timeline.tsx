@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Pencil, Plus, X } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, X } from 'lucide-react'
 import type { StageKey, TimelineStep as TimelineStepType } from '../../types'
 import { formatDate } from '../../utils/format'
 
@@ -60,9 +60,12 @@ const STATUS_CLASS: Record<TimelineStepType['status'], string> = {
   withdrawn: 'bg-red-50 text-danger',
 }
 
-/** 編輯面板：按下鉛筆才會出現，平常畫面保持乾淨也不會誤按。 */
-function EditPanel({
+/** 點開卡片後看到的細節；平常唯讀，按下鉛筆才切換成可編輯。 */
+function DetailPanel({
   step,
+  editable,
+  editing,
+  onEdit,
   onChangeDate,
   onChangeOfficer,
   onAddNote,
@@ -70,6 +73,9 @@ function EditPanel({
   onDone,
 }: {
   step: TimelineStepType
+  editable: boolean
+  editing: boolean
+  onEdit: () => void
   onChangeDate?: (key: StageKey, date: string) => void
   onChangeOfficer?: (key: StageKey, officer: string) => void
   onAddNote?: (key: StageKey, note: string) => void
@@ -88,77 +94,109 @@ function EditPanel({
 
   const fieldClass =
     'min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-primary focus:outline-none focus:ring-2 focus:ring-blue-100'
+  const rowClass = 'flex items-center gap-2'
+  const labelClass = 'w-14 shrink-0 text-xs text-ink-faint'
 
   return (
-    <div className="mt-2 space-y-2.5 rounded-xl border border-blue-100 bg-blue-50/40 p-3 text-sm">
-      <div className="flex items-center gap-2">
-        <span className="w-14 shrink-0 text-xs text-ink-faint">日期</span>
-        <input
-          type="date"
-          value={step.completedDate ?? ''}
-          onChange={(e) => onChangeDate?.(step.key, e.target.value)}
-          aria-label={`${step.label} 日期`}
-          className={fieldClass}
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="w-14 shrink-0 text-xs text-ink-faint">受理人</span>
-        <input
-          value={step.officer ?? ''}
-          onChange={(e) => onChangeOfficer?.(step.key, e.target.value)}
-          placeholder="這一關的受理人"
-          aria-label={`${step.label} 受理人`}
-          className={fieldClass}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <span className="text-xs text-ink-faint">備註</span>
-        {notes.map((note, i) => (
-          <div key={`${note}-${i}`} className="flex items-start gap-2 rounded-lg bg-white px-2.5 py-1.5">
-            <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-ink">{note}</p>
-            <button
-              onClick={() => onRemoveNote?.(step.key, i)}
-              aria-label={`刪除備註：${note}`}
-              className="shrink-0 rounded p-0.5 text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
-            >
-              <X size={13} />
-            </button>
-          </div>
-        ))}
-        <div className="flex gap-1.5">
+    <div
+      className={`mt-2 space-y-2.5 rounded-xl border p-3 text-sm transition-colors duration-200 ${
+        editing ? 'border-blue-100 bg-blue-50/40' : 'border-slate-100 bg-slate-50/70'
+      }`}
+    >
+      <div className={rowClass}>
+        <span className={labelClass}>日期</span>
+        {editing ? (
           <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                submitNote()
-              }
-            }}
-            placeholder="新增這一關的備註"
-            aria-label={`${step.label} 新增備註`}
+            type="date"
+            value={step.completedDate ?? ''}
+            onChange={(e) => onChangeDate?.(step.key, e.target.value)}
+            aria-label={`${step.label} 日期`}
             className={fieldClass}
           />
-          <button
-            onClick={submitNote}
-            disabled={!draft.trim()}
-            aria-label={`${step.label} 儲存備註`}
-            className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-primary-hover disabled:bg-slate-200 disabled:text-ink-faint"
-          >
-            <Plus size={13} />
-            新增
-          </button>
-        </div>
+        ) : (
+          <span className="font-medium text-ink">
+            {step.completedDate ? formatDate(step.completedDate) : '—'}
+          </span>
+        )}
       </div>
 
-      <button
-        onClick={onDone}
-        className="w-full rounded-lg bg-white py-1.5 text-xs font-semibold text-ink-soft transition-colors duration-150 hover:text-ink"
-      >
-        完成編輯
-      </button>
+      <div className={rowClass}>
+        <span className={labelClass}>受理人</span>
+        {editing ? (
+          <input
+            value={step.officer ?? ''}
+            onChange={(e) => onChangeOfficer?.(step.key, e.target.value)}
+            placeholder="這一關的受理人"
+            aria-label={`${step.label} 受理人`}
+            className={fieldClass}
+          />
+        ) : (
+          <span className="font-medium text-ink">{step.officer || '—'}</span>
+        )}
+      </div>
+
+      {/* 備註在收合狀態就看得到了，這裡只在編輯時出現，避免同一則顯示兩次 */}
+      {editing && (
+        <div className="space-y-1.5">
+          <span className="text-xs text-ink-faint">備註</span>
+          {notes.map((note, i) => (
+            <div key={`${note}-${i}`} className="flex items-start gap-2 rounded-lg bg-white px-2.5 py-1.5">
+              <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-ink">{note}</p>
+              <button
+                onClick={() => onRemoveNote?.(step.key, i)}
+                aria-label={`刪除備註：${note}`}
+                className="shrink-0 rounded p-0.5 text-ink-faint transition-colors duration-150 hover:bg-red-50 hover:text-danger"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-1.5">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submitNote()
+                }
+              }}
+              placeholder="新增這一關的備註"
+              aria-label={`${step.label} 新增備註`}
+              className={fieldClass}
+            />
+            <button
+              onClick={submitNote}
+              disabled={!draft.trim()}
+              aria-label={`${step.label} 儲存備註`}
+              className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-semibold text-white transition-colors duration-150 hover:bg-primary-hover disabled:bg-slate-200 disabled:text-ink-faint"
+            >
+              <Plus size={13} />
+              新增
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editable &&
+        (editing ? (
+          <button
+            onClick={onDone}
+            className="w-full rounded-lg bg-white py-1.5 text-xs font-semibold text-ink-soft transition-colors duration-150 hover:text-ink"
+          >
+            完成編輯
+          </button>
+        ) : (
+          // 要編輯得多按這一下，就不會在查看時誤改資料
+          <button
+            onClick={onEdit}
+            aria-label={`編輯${step.label}`}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-1.5 text-xs font-semibold text-ink-soft transition-colors duration-150 hover:border-primary hover:text-primary"
+          >
+            <Pencil size={12} />
+            編輯這一關
+          </button>
+        ))}
     </div>
   )
 }
@@ -172,17 +210,19 @@ export default function Timeline({
   onAddNote,
   onRemoveNote,
 }: TimelineProps) {
-  // 平常都是唯讀，按下鉛筆才進入編輯，一次只編輯一關
+  // 點卡片展開細節；細節裡再按鉛筆才進入編輯，一次只編輯一關
+  const [openKey, setOpenKey] = useState<string | null>(null)
   const [editingKey, setEditingKey] = useState<string | null>(null)
 
   return (
     <div>
       {steps.map((step, i) => {
         const isLast = i === steps.length - 1
+        const isOpen = openKey === step.key
         const isEditing = editingKey === step.key
         const notes = step.notes ?? []
-        // 未開始的關卡還沒有內容可填
-        const canEdit = editable && step.status !== 'pending'
+        // 未開始的關卡還沒有內容可看或可填
+        const isInteractive = step.status !== 'pending'
         const showOfficer = step.officer && step.officer !== caseOfficer
 
         return (
@@ -199,7 +239,18 @@ export default function Timeline({
             </div>
 
             <div className="min-w-0 flex-1 pb-5">
-              <div className="flex min-h-8 items-center gap-2">
+              {/* 整張卡片可以點開看細節 */}
+              <button
+                onClick={() => {
+                  if (!isInteractive) return
+                  setOpenKey(isOpen ? null : step.key)
+                  setEditingKey(null)
+                }}
+                disabled={!isInteractive}
+                className={`flex min-h-8 w-full items-center gap-2 rounded-lg text-left transition-colors duration-150 ${
+                  isInteractive ? 'hover:bg-slate-50' : 'cursor-default'
+                }`}
+              >
                 <span className={`text-sm font-bold ${step.status === 'pending' ? 'text-ink-faint' : 'text-ink'}`}>
                   {step.label}
                 </span>
@@ -209,19 +260,15 @@ export default function Timeline({
                 {step.completedDate && (
                   <span className="text-[11px] tabular-nums text-ink-faint">{formatDate(step.completedDate)}</span>
                 )}
-                {canEdit && (
-                  <button
-                    onClick={() => setEditingKey(isEditing ? null : step.key)}
-                    title={`編輯${step.label}`}
-                    aria-label={`編輯${step.label}`}
-                    className={`ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ${
-                      isEditing ? 'bg-primary text-white' : 'text-ink-faint hover:bg-slate-100 hover:text-ink'
+                {isInteractive && (
+                  <ChevronDown
+                    size={15}
+                    className={`ml-auto shrink-0 text-ink-faint transition-transform duration-200 ${
+                      isOpen ? 'rotate-180' : ''
                     }`}
-                  >
-                    <Pencil size={13} />
-                  </button>
+                  />
                 )}
-              </div>
+              </button>
 
               {/* 受理人與本關相同時不重複顯示，畫面才乾淨 */}
               {showOfficer && <p className="mt-1 text-xs text-ink-soft">受理人：{step.officer}</p>}
@@ -242,7 +289,7 @@ export default function Timeline({
               )}
 
               <AnimatePresence initial={false}>
-                {isEditing && (
+                {isOpen && isInteractive && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -250,8 +297,11 @@ export default function Timeline({
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="overflow-hidden"
                   >
-                    <EditPanel
+                    <DetailPanel
                       step={step}
+                      editable={editable}
+                      editing={isEditing}
+                      onEdit={() => setEditingKey(step.key)}
                       onChangeDate={onChangeDate}
                       onChangeOfficer={onChangeOfficer}
                       onAddNote={onAddNote}

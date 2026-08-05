@@ -182,7 +182,7 @@ export default function CaseDrawer({
 
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <h3 className="text-sm font-bold text-ink">案件流程時間軸</h3>
-                {!deleted && <span className="text-[11px] text-ink-faint">按 ✎ 可修改日期、受理人與備註</span>}
+                {!deleted && <span className="text-[11px] text-ink-faint">點一下看細節，按 ✎ 才能修改</span>}
               </div>
               <Timeline
                 steps={loanCase.timeline}
