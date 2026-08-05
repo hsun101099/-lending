@@ -1,6 +1,5 @@
-import { ALL_FILTER_STAGES, STAGE_CONFIG } from '../../data/stages'
+import { STAGE_CONFIG } from '../../data/stages'
 import { formatDate, formatWan } from '../../utils/format'
-import { getSummaryCounts } from '../../utils/metrics'
 import { describeFilters, type ReportFilters } from '../../utils/reportFilters'
 import { isOverdue } from '../table/LoanTable'
 import type { LoanCase } from '../../types'
@@ -12,15 +11,14 @@ interface PrintableReportProps {
 
 const COLUMNS = ['案件編號', '客戶姓名', '貸款金額', '類別', '貸款種類', '受理人', '建立日期', '目前流程', '進度', '備註']
 
-/** 首頁需容納統計摘要，可放的明細列數較少。 */
-const FIRST_PAGE_ROWS = 12
-const OTHER_PAGE_ROWS = 20
+/** 每頁可容納的明細列數 */
+const ROWS_PER_PAGE = 20
 
 function paginate(cases: LoanCase[]): LoanCase[][] {
   if (cases.length === 0) return [[]]
-  const pages = [cases.slice(0, FIRST_PAGE_ROWS)]
-  for (let i = FIRST_PAGE_ROWS; i < cases.length; i += OTHER_PAGE_ROWS) {
-    pages.push(cases.slice(i, i + OTHER_PAGE_ROWS))
+  const pages = [cases.slice(0, ROWS_PER_PAGE)]
+  for (let i = ROWS_PER_PAGE; i < cases.length; i += ROWS_PER_PAGE) {
+    pages.push(cases.slice(i, i + ROWS_PER_PAGE))
   }
   return pages
 }
@@ -73,26 +71,9 @@ function DetailTable({ rows }: { rows: LoanCase[] }) {
   )
 }
 
+/** 報表只印案件明細；統計摘要日後如有需要再加回來。 */
 export default function PrintableReport({ cases, filters }: PrintableReportProps) {
-  const summary = getSummaryCounts(cases)
-  const totalAmount = cases.reduce((sum, c) => sum + c.loanAmount, 0)
-  const overdueCount = cases.filter(isOverdue).length
   const pages = paginate(cases)
-
-  const stageCounts = ALL_FILTER_STAGES.map((stage) => ({
-    stage,
-    label: STAGE_CONFIG[stage].label,
-    count: cases.filter((c) => c.currentStage === stage).length,
-  }))
-
-  const summaryTiles = [
-    { label: '案件總數', value: `${summary.total} 件` },
-    { label: '處理中', value: `${summary.processing} 件` },
-    { label: '已完成', value: `${summary.completed} 件` },
-    { label: '撤件', value: `${summary.withdrawn} 件` },
-    { label: '逾期未更新', value: `${overdueCount} 件` },
-    { label: '貸款總金額', value: formatWan(totalAmount) },
-  ]
 
   return (
     <div className="print-doc">
@@ -113,45 +94,7 @@ export default function PrintableReport({ cases, filters }: PrintableReportProps
             <p className="mt-1.5 text-[10.5px] font-medium text-[#334155]">{describeFilters(filters)}</p>
           </header>
 
-          {pageIndex === 0 && (
-            <section className="mb-4">
-              <h2 className="mb-2 text-[12.5px] font-bold">一、統計摘要</h2>
-              <div className="grid grid-cols-6 gap-2">
-                {summaryTiles.map((tile) => (
-                  <div key={tile.label} className="rounded border border-[#cbd5e1] px-2.5 py-1.5">
-                    <p className="text-[9.5px] text-[#64748b]">{tile.label}</p>
-                    <p className="mt-0.5 text-[14px] font-bold tabular-nums">{tile.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <table className="mt-2.5 w-full border-collapse text-[10.5px]">
-                <thead>
-                  <tr>
-                    <th className={HEAD_CELL}>流程階段</th>
-                    {stageCounts.map((s) => (
-                      <th key={s.stage} className={`${HEAD_CELL} text-center`}>
-                        {s.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className={`${CELL} font-medium`}>案件數</td>
-                    {stageCounts.map((s) => (
-                      <td key={s.stage} className={`${CELL} text-center tabular-nums`}>
-                        {s.count}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </section>
-          )}
-
           <section className="flex-1">
-            {pageIndex === 0 && <h2 className="mb-2 text-[12.5px] font-bold">二、案件明細</h2>}
             {cases.length === 0 ? (
               <p className="rounded border border-dashed border-[#cbd5e1] py-8 text-center text-[10.5px] text-[#64748b]">
                 查無符合篩選條件的案件

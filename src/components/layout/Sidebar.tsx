@@ -19,7 +19,7 @@ const NAV_ITEMS: { key: ViewMode | null; label: string; icon: typeof LayoutDashb
   { key: 'dashboard', label: '案件總覽', icon: LayoutDashboard, enabled: true },
   { key: null, label: '案件管理', icon: FileText, enabled: false },
   { key: null, label: '客戶資料', icon: Users, enabled: false },
-  { key: 'manager', label: '主管報表', icon: BarChart3, enabled: true },
+  { key: 'manager', label: '列印報表', icon: BarChart3, enabled: true },
   { key: 'trash', label: '已刪除案件', icon: Trash2, enabled: true },
 ]
 

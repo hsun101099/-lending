@@ -13,6 +13,7 @@ import { getDb } from './firebase'
 import { buildCase, type NewCaseInput } from '../utils/caseActions'
 import { normalizeCase } from '../utils/normalizeCase'
 import { compareCaseIdDesc } from '../utils/caseId'
+import { planRenumber } from '../utils/renumberCases'
 import type { LoanCase } from '../types'
 
 const CASES = 'cases'
@@ -89,6 +90,38 @@ export async function restoreCase(id: string): Promise<void> {
 /** 永久刪除，資料無法再復原。僅供回收桶內明確確認後使用。 */
 export async function purgeCase(id: string): Promise<void> {
   await deleteDoc(doc(getDb(), CASES, id))
+}
+
+/**
+ * 把舊格式的案件編號（LN-2026-1001）整批換成流水號，依建立時間由 1 開始。
+ * 整批一次寫入，中途失敗不會只改一半。
+ */
+export async function renumberAllCases(cases: LoanCase[]): Promise<number> {
+  const { moves, nextCounter } = planRenumber(cases)
+  if (moves.length === 0) return 0
+
+  const db = getDb()
+  const batch = writeBatch(db)
+  const byId = new Map(cases.map((c) => [c.id, c]))
+  const newIds = new Set(moves.map((m) => m.to))
+
+  moves.forEach(({ from, to }) => {
+    const loanCase = byId.get(from)
+    if (!loanCase) return
+    const { id: _omit, ...payload } = loanCase
+    batch.set(doc(db, CASES, to), payload)
+  })
+
+  // 只刪除沒有被新編號用到的舊文件，避免把剛寫好的資料又刪掉
+  moves
+    .filter(({ from }) => !newIds.has(from))
+    .forEach(({ from }) => batch.delete(doc(db, CASES, from)))
+
+  // 發號計數器要跟著調整，之後新增的案件才會從下一號開始
+  batch.set(doc(db, COUNTERS, CASE_NO_COUNTER), { value: nextCounter }, { merge: true })
+
+  await batch.commit()
+  return moves.length
 }
 
 /** 一次性把舊版存在瀏覽器的案件搬上雲端。 */

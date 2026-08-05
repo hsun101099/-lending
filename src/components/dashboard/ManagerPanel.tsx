@@ -70,7 +70,7 @@ export default function ManagerPanel({
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-ink">主管報表</h2>
+          <h2 className="text-lg font-bold text-ink">列印報表</h2>
           <p className="mt-1 text-sm text-ink-faint">全行放款案件即時營運指標</p>
         </div>
         <button
@@ -78,7 +78,7 @@ export default function ManagerPanel({
           className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-soft shadow-sm transition-colors duration-150 hover:border-primary hover:text-primary"
         >
           <Printer size={16} />
-          列印報表
+          篩選
         </button>
       </div>
 

@@ -19,11 +19,18 @@ import {
   type NewCaseInput,
 } from '../src/utils/caseActions'
 import { normalizeCase } from '../src/utils/normalizeCase'
-import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS } from '../src/utils/reportFilters'
+import {
+  applyReportFilters,
+  countActiveFilters,
+  describeFilters,
+  EMPTY_REPORT_FILTERS,
+  recentDaysRange,
+} from '../src/utils/reportFilters'
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
 import { formatWan, wanToNt, formatDate } from '../src/utils/format'
 import { describeDeletedAt, isDeleted, partitionCases } from '../src/utils/recycleBin'
 import { compareCaseIdDesc, isLegacyCaseId } from '../src/utils/caseId'
+import { needsRenumber, planRenumber } from '../src/utils/renumberCases'
 import {
   getEmployeeId,
   normalizeEmployeeId,
@@ -471,7 +478,106 @@ console.log('=== 12. 案件編號 1、2、3 ===')
   check(compareCaseIdDesc('10', '9') < 0, '10 排在 9 前面（不是字串比大小）')
 }
 
-console.log('=== 13. 密碼 ===')
+console.log('=== 13. 依建立時間重新編號 ===')
+{
+  const mk = (id: string, createdDate: string) => ({ ...buildCase(makeInput(0), id), createdDate })
+  const before = [
+    mk('LN-2026-1004', '2026-08-03'),
+    mk('2', '2026-08-05'),
+    mk('LN-2026-1002', '2026-04-15'),
+    mk('1', '2026-08-04'),
+    mk('LN-2026-1005', '2026-07-23'),
+  ]
+  check(needsRenumber(before), '有舊格式編號時需要重編')
+
+  const { moves, nextCounter } = planRenumber(before)
+  const mapping = Object.fromEntries(moves.map((m) => [m.from, m.to]))
+  check(mapping['LN-2026-1002'] === '1', '最早建立的變成 1', mapping['LN-2026-1002'])
+  check(mapping['LN-2026-1005'] === '2', '第二早的變成 2', mapping['LN-2026-1005'])
+  check(mapping['LN-2026-1004'] === '3', '第三早的變成 3', mapping['LN-2026-1004'])
+  check(mapping['1'] === '4', '之後建立的接在後面', mapping['1'])
+  check(mapping['2'] === '5', '最新建立的排最後', mapping['2'])
+  check(nextCounter === 5, '計數器對齊最大號碼', String(nextCounter))
+  check(new Set(moves.map((m) => m.to)).size === moves.length, '新編號沒有重複')
+
+  // 重編後就不該再重編（永久刪除造成的號碼空缺也不會觸發）
+  const after = moves.map((m) => mk(m.to, before.find((c) => c.id === m.from)!.createdDate))
+  check(!needsRenumber(after), '重編後不會再次觸發')
+  check(!needsRenumber(after.filter((c) => c.id !== '3')), '有案件被永久刪除也不會重編')
+  check(!needsRenumber([]), '沒有案件時不需要重編')
+
+  // 排序仍然由新到舊
+  const sorted = after.map((c) => c.id).sort(compareCaseIdDesc)
+  check(sorted[0] === '5' && sorted[sorted.length - 1] === '1', '重編後排序仍是新到舊', sorted.join(','))
+}
+
+console.log('=== 14. 報表篩選：類別、種類、金額、天數 ===')
+{
+  const base = (i: number, over: Partial<LoanCase>) => ({ ...buildCase(makeInput(i), String(i + 1)), ...over })
+  const pool: LoanCase[] = [
+    base(0, { category: '新貸', loanType: '購置自用住宅', loanAmount: wanToNt(500), createdDate: '2026-08-01' }),
+    base(1, { category: '展期', loanType: '理財週轉', loanAmount: wanToNt(1200), createdDate: '2026-06-01' }),
+    base(2, { category: '新貸', loanType: '理財週轉', loanAmount: wanToNt(80), createdDate: '2026-01-01' }),
+    base(3, { category: '追加', loanType: '土建融貸款', loanAmount: wanToNt(6000), createdDate: '2025-12-01' }),
+  ]
+
+  const byCategory = applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, categories: ['新貸'] })
+  check(byCategory.length === 2 && byCategory.every((c) => c.category === '新貸'), '類別篩選', String(byCategory.length))
+  check(
+    applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, categories: ['新貸', '追加'] }).length === 3,
+    '類別可複選'
+  )
+
+  const byType = applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, loanTypes: ['理財週轉'] })
+  check(byType.length === 2 && byType.every((c) => c.loanType === '理財週轉'), '貸款種類篩選', String(byType.length))
+
+  check(
+    applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, amountFromWan: '500' }).length === 3,
+    '金額下限篩選'
+  )
+  check(applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, amountToWan: '500' }).length === 2, '金額上限篩選')
+  const range = applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, amountFromWan: '100', amountToWan: '1500' })
+  check(range.length === 2, '金額區間篩選', String(range.length))
+  check(
+    applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, amountFromWan: '', amountToWan: '' }).length === pool.length,
+    '金額留空代表不限'
+  )
+
+  // 條件可以疊加
+  const combined = applyReportFilters(pool, {
+    ...EMPTY_REPORT_FILTERS,
+    categories: ['新貸'],
+    loanTypes: ['理財週轉'],
+    amountToWan: '100',
+  })
+  check(combined.length === 1 && combined[0].loanAmount === wanToNt(80), '多個條件同時成立才留下')
+
+  // 最近 N 天
+  const today = new Date('2026-08-05T10:00:00')
+  const week = recentDaysRange(7, today)
+  check(week.dateTo === '2026-08-05', '最近 7 天的結束日是今天', week.dateTo)
+  check(week.dateFrom === '2026-07-30', '最近 7 天含今天共 7 天', week.dateFrom)
+  check(recentDaysRange(30, today).dateFrom === '2026-07-07', '最近 30 天起日', recentDaysRange(30, today).dateFrom)
+  check(applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, ...week }).length === 1, '套用最近 7 天')
+
+  check(countActiveFilters(EMPTY_REPORT_FILTERS) === 0, '沒有條件時為 0 項')
+  check(
+    countActiveFilters({ ...EMPTY_REPORT_FILTERS, categories: ['新貸'], amountFromWan: '100', ...week }) === 3,
+    '已套用條件計數'
+  )
+  const described = describeFilters({
+    ...EMPTY_REPORT_FILTERS,
+    categories: ['新貸'],
+    loanTypes: ['理財週轉'],
+    amountFromWan: '100',
+    amountToWan: '1500',
+  })
+  check(described.includes('類別：新貸'), '說明文字含類別')
+  check(described.includes('貸款種類：理財週轉'), '說明文字含貸款種類')
+  check(described.includes('100萬') && described.includes('1,500萬'), '說明文字含金額區間', described)
+}
+
+console.log('=== 15. 密碼 ===')
 {
   // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
   check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))

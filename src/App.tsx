@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, CloudUpload, FilePlus2, Loader2, X } from 'lucide-react'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
@@ -27,12 +27,14 @@ import {
   type NewCaseInput,
 } from './utils/caseActions'
 import { partitionCases } from './utils/recycleBin'
+import { needsRenumber } from './utils/renumberCases'
 import { isFirebaseConfigured } from './services/firebaseConfig'
 import { logout, useAuth } from './hooks/useAuth'
 import { isJoinInProgress, watchMembership, type MembershipStatus } from './services/membership'
 import {
   createCase,
   importCases,
+  renumberAllCases,
   purgeCase,
   restoreCase,
   saveCase,
@@ -41,14 +43,14 @@ import {
 } from './services/caseRepository'
 import type { LoanCase, StageKey } from './types'
 
-// 主管報表含多張圖表，體積較大且非進站首屏，改為切換到該頁時才載入。
+// 列印報表含多張圖表，體積較大且非進站首屏，改為切換到該頁時才載入。
 const ManagerPanel = lazy(() => import('./components/dashboard/ManagerPanel'))
 
 export type ViewMode = 'dashboard' | 'manager' | 'trash'
 
 const VIEW_TABS: { key: ViewMode; label: string }[] = [
   { key: 'dashboard', label: '案件總覽' },
-  { key: 'manager', label: '主管報表' },
+  { key: 'manager', label: '列印報表' },
   { key: 'trash', label: '已刪除' },
 ]
 
@@ -87,6 +89,7 @@ function App() {
   const [isAccountOpen, setAccountOpen] = useState(false)
   const [membership, setMembership] = useState<MembershipStatus | null>(null)
   const [joinTick, setJoinTick] = useState(0)
+  const renumbering = useRef(false)
 
   // 先確認這個帳號在單位名冊裡，才開始讀案件資料。
   // 持續訂閱，這樣剛用註冊碼加入的人會立刻進到系統，不會被重複詢問。
@@ -129,6 +132,16 @@ function App() {
       }
     )
   }, [user, joined])
+
+  // 舊格式的案件編號（LN-2026-1001）只要出現過一次，就依建立時間整批換成 1、2、3……
+  useEffect(() => {
+    if (casesLoading || renumbering.current || !needsRenumber(allCases)) return
+    renumbering.current = true
+    renumberAllCases(allCases).catch((e) => {
+      renumbering.current = false
+      reportFailure('重新編號', e)
+    })
+  }, [allCases, casesLoading])
 
   // Firestore 連不上時不會回報錯誤、只會無限重試，因此改由逾時提示使用者檢查設定。
   useEffect(() => {
@@ -307,7 +320,7 @@ function App() {
             view === 'dashboard'
               ? '案件列表與登打'
               : view === 'manager'
-                ? '主管報表 Manager Dashboard'
+                ? '列印報表與營運指標'
                 : '已刪除案件，可隨時復原'
           }
           overdueCount={overdueCount}

@@ -14,7 +14,16 @@ import {
   X,
 } from 'lucide-react'
 import { ALL_FILTER_STAGES, STAGE_CONFIG } from '../../data/stages'
-import { applyReportFilters, describeFilters, EMPTY_REPORT_FILTERS, type ReportFilters } from '../../utils/reportFilters'
+import { CATEGORY_OPTIONS } from '../../data/categories'
+import { LOAN_TYPE_OPTIONS } from '../../data/loanTypes'
+import {
+  applyReportFilters,
+  countActiveFilters,
+  describeFilters,
+  EMPTY_REPORT_FILTERS,
+  recentDaysRange,
+  type ReportFilters,
+} from '../../utils/reportFilters'
 import { getSummaryCounts } from '../../utils/metrics'
 import { formatWan } from '../../utils/format'
 import { isOverdue } from '../table/LoanTable'
@@ -28,6 +37,13 @@ const SHEET_WIDTH_PX = 1032
 const MIN_READABLE_SCALE = 0.85
 const MAX_SCALE = 1.6
 const ZOOM_STEP = 0.15
+/** 常用的天數區間 */
+const RECENT_DAY_OPTIONS = [7, 30, 90, 180]
+
+function isRecentRange(filters: ReportFilters, days: number): boolean {
+  const range = recentDaysRange(days)
+  return filters.dateFrom === range.dateFrom && filters.dateTo === range.dateTo
+}
 
 type Step = 'filter' | 'preview'
 
@@ -55,6 +71,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
   const isScrollable = scale > fitScale + 0.001
 
   const filteredCases = useMemo(() => applyReportFilters(cases, filters), [cases, filters])
+  const activeFilterCount = countActiveFilters(filters)
   const summary = getSummaryCounts(filteredCases)
   const totalAmount = filteredCases.reduce((sum, c) => sum + c.loanAmount, 0)
   const overdueCount = filteredCases.filter(isOverdue).length
@@ -120,6 +137,14 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
     } finally {
       setDownloading(false)
     }
+  }
+
+  /** 類別、貸款種類這類多選條件：點一下加入，再點一下移除。 */
+  function toggleValue(key: 'categories' | 'loanTypes', value: string) {
+    setFilters((f) => ({
+      ...f,
+      [key]: f[key].includes(value) ? f[key].filter((v) => v !== value) : [...f[key], value],
+    }))
   }
 
   function toggleStage(stage: StageKey) {
@@ -192,24 +217,132 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
               {step === 'filter' ? (
                 <>
                   <div className="print-hide flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-ink-soft">建立日期（起）</label>
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold text-ink-soft">
+                        建立日期
+                        <span className="ml-1 font-normal text-ink-faint">可直接選最近幾天</span>
+                      </label>
+                      {/* 常用的天數區間，按一下就套用，不用自己算日期 */}
+                      <div className="mb-2.5 flex flex-wrap gap-1.5">
+                        {RECENT_DAY_OPTIONS.map((days) => (
+                          <button
+                            key={days}
+                            type="button"
+                            onClick={() => setFilters((f) => ({ ...f, ...recentDaysRange(days) }))}
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-150 ${
+                              isRecentRange(filters, days)
+                                ? 'border-primary bg-blue-50 text-primary'
+                                : 'border-slate-200 text-ink-soft hover:border-primary hover:text-primary'
+                            }`}
+                          >
+                            最近 {days} 天
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setFilters((f) => ({ ...f, dateFrom: '', dateTo: '' }))}
+                          className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-ink-soft transition-colors duration-150 hover:border-primary hover:text-primary"
+                        >
+                          不限日期
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <input
                           type="date"
                           value={filters.dateFrom}
                           onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+                          aria-label="建立日期（起）"
                           className={fieldClass}
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-ink-soft">建立日期（迄）</label>
                         <input
                           type="date"
                           value={filters.dateTo}
                           onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
+                          aria-label="建立日期（迄）"
                           className={fieldClass}
                         />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold text-ink-soft">
+                        貸款金額（萬）
+                        <span className="ml-1 font-normal text-ink-faint">留空代表不限</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={filters.amountFromWan}
+                          onChange={(e) => setFilters((f) => ({ ...f, amountFromWan: e.target.value }))}
+                          placeholder="最低"
+                          aria-label="貸款金額下限（萬）"
+                          className={fieldClass}
+                        />
+                        <span className="shrink-0 text-xs text-ink-faint">~</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={filters.amountToWan}
+                          onChange={(e) => setFilters((f) => ({ ...f, amountToWan: e.target.value }))}
+                          placeholder="最高"
+                          aria-label="貸款金額上限（萬）"
+                          className={fieldClass}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold text-ink-soft">
+                        類別
+                        <span className="ml-1 font-normal text-ink-faint">不選代表全部</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {CATEGORY_OPTIONS.map((category) => {
+                          const active = filters.categories.includes(category)
+                          return (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => toggleValue('categories', category)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+                                active
+                                  ? 'border-primary bg-blue-50 text-primary'
+                                  : 'border-slate-200 text-ink-soft hover:border-primary hover:text-primary'
+                              }`}
+                            >
+                              {category}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold text-ink-soft">
+                        貸款種類
+                        <span className="ml-1 font-normal text-ink-faint">不選代表全部</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {LOAN_TYPE_OPTIONS.map((loanType) => {
+                          const active = filters.loanTypes.includes(loanType)
+                          return (
+                            <button
+                              key={loanType}
+                              type="button"
+                              onClick={() => toggleValue('loanTypes', loanType)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+                                active
+                                  ? 'border-primary bg-blue-50 text-primary'
+                                  : 'border-slate-200 text-ink-soft hover:border-primary hover:text-primary'
+                              }`}
+                            >
+                              {loanType}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -292,6 +425,11 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       <p className="text-xs text-ink-soft">
                         符合條件 <span className="text-sm font-bold text-ink">{filteredCases.length}</span>
                         <span className="text-ink-faint"> / {cases.length} 筆</span>
+                        {activeFilterCount > 0 && (
+                          <span className="ml-1.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            已套用 {activeFilterCount} 項條件
+                          </span>
+                        )}
                       </p>
                       <button
                         onClick={() => setFilters(EMPTY_REPORT_FILTERS)}
