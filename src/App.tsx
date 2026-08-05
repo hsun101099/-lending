@@ -20,6 +20,8 @@ import {
   addStepNote,
   advanceStage,
   removeStepNote,
+  revertStage,
+  setStepOfficer,
   updateTimelineStep,
   withdrawCase,
   type NewCaseInput,
@@ -204,6 +206,14 @@ function App() {
   function handleCreateCase(input: NewCaseInput) {
     setNewCaseOpen(false)
     createCase(input).catch((e) => reportFailure('建立案件', e))
+  }
+
+  function handleRevertStage(id: string) {
+    editCase(id, revertStage, '退回上一關')
+  }
+
+  function handleChangeStepOfficer(id: string, key: StageKey, officer: string) {
+    editCase(id, (c) => setStepOfficer(c, key, officer), '修改受理人')
   }
 
   function handleChangeStepDate(id: string, key: StageKey, date: string) {
@@ -463,7 +473,9 @@ function App() {
         onUpdateRemarks={handleUpdateRemarks}
         onDelete={setPendingDelete}
         onRestore={handleRestore}
+        onRevertStage={handleRevertStage}
         onChangeStepDate={handleChangeStepDate}
+        onChangeStepOfficer={handleChangeStepOfficer}
         onAddStepNote={handleAddStepNote}
         onRemoveStepNote={handleRemoveStepNote}
       />

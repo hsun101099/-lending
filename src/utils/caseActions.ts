@@ -120,6 +120,57 @@ export function advanceStage(loanCase: LoanCase): LoanCase {
   }
 }
 
+/**
+ * 退回上一關。按錯「更新流程」時可以還原，撤件後也能用它把案件救回來。
+ * 被退回的那一關會清掉完成日期，重新成為進行中。
+ */
+export function revertStage(loanCase: LoanCase): LoanCase {
+  const today = getTodayIso()
+
+  // 撤件：拿掉撤件那一筆，回到撤件前所在的關卡
+  if (loanCase.currentStage === 'withdrawn') {
+    const kept = loanCase.timeline.filter((step) => step.key !== 'withdrawn')
+    const lastDoneIdx = kept.reduce((last, step, i) => (step.status === 'completed' ? i : last), -1)
+    if (lastDoneIdx < 0) return loanCase
+    const backTo = STAGE_ORDER[lastDoneIdx]
+    return {
+      ...loanCase,
+      currentStage: backTo,
+      progress: stageProgress(backTo),
+      lastUpdated: today,
+      timeline: kept.map((step, i) =>
+        i === lastDoneIdx
+          ? clean({ ...step, status: 'current' as const, completedDate: undefined })
+          : step
+      ),
+    }
+  }
+
+  // 第一關（受理）沒有上一關可退
+  const idx = STAGE_ORDER.indexOf(loanCase.currentStage)
+  if (idx <= 0) return loanCase
+
+  const backTo = STAGE_ORDER[idx - 1]
+  const timeline = loanCase.timeline.map((step, i) => {
+    if (i === idx) return clean({ ...step, status: 'pending' as const, completedDate: undefined })
+    if (i === idx - 1) return clean({ ...step, status: 'current' as const, completedDate: undefined })
+    return step
+  })
+
+  return {
+    ...loanCase,
+    currentStage: backTo,
+    progress: stageProgress(backTo),
+    lastUpdated: today,
+    timeline,
+  }
+}
+
+/** 更新某一關的受理人。 */
+export function setStepOfficer(loanCase: LoanCase, key: StageKey, officer: string): LoanCase {
+  return updateTimelineStep(loanCase, key, { officer: officer.trim() })
+}
+
 export function withdrawCase(loanCase: LoanCase): LoanCase {
   if (loanCase.currentStage === 'withdrawn' || loanCase.currentStage === 'disbursement') return loanCase
 

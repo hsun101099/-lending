@@ -14,6 +14,7 @@ import {
   withdrawCase,
   addStepNote,
   removeStepNote,
+  revertStage,
   updateTimelineStep,
   type NewCaseInput,
 } from '../src/utils/caseActions'
@@ -403,7 +404,59 @@ console.log('=== 10. 流程備註：可累加、可個別刪除 ===')
   check(findUndefinedPaths(legacyNote).length === 0, '併入後可安全寫入 Firestore')
 }
 
-console.log('=== 11. 案件編號 1、2、3 ===')
+console.log('=== 11. 退回上一關（按錯時可還原）===')
+{
+  // 每一關推進後都要能退回
+  for (let i = 0; i < STAGE_ORDER.length - 1; i++) {
+    let c = buildCase(makeInput(i, STAGE_ORDER[i]), `${100 + i}`)
+    const before = c.currentStage
+    c = advanceStage(c)
+    c = roundTrip(c, `推進到${STAGE_CONFIG[c.currentStage].label}`)
+    const advanced = c.currentStage
+    c = revertStage(c)
+    c = roundTrip(c, `從${STAGE_CONFIG[advanced].label}退回`)
+    check(c.currentStage === before, `從${STAGE_CONFIG[advanced].label}退回${STAGE_CONFIG[before].label}`, c.currentStage)
+    check(c.progress === stageProgress(before), '退回後進度跟著回復', String(c.progress))
+    const backStep = c.timeline.find((s) => s.key === before)
+    check(backStep?.status === 'current', '退回的那一關重新變成進行中', backStep?.status)
+    check(backStep?.completedDate === undefined, '退回的那一關清掉完成日期')
+    check(c.timeline.find((s) => s.key === advanced)?.status === 'pending', '被退回的關卡回到未開始')
+    check(c.timeline.filter((s) => s.status === 'current').length === 1, '退回後只有一關進行中')
+  }
+
+  // 第一關沒有上一關
+  const first = buildCase(makeInput(0, 'intake'), '200')
+  check(revertStage(first).currentStage === 'intake', '第一關退回維持不變')
+
+  // 撥款（結案）也要能退回
+  let done = buildCase(makeInput(1, 'finalApproval'), '201')
+  done = advanceStage(done)
+  check(done.currentStage === 'disbursement', '先推進到撥款')
+  done = roundTrip(revertStage(done), '從撥款退回')
+  check(done.currentStage === 'finalApproval', '撥款可退回核定', done.currentStage)
+  check(done.progress === stageProgress('finalApproval'), '退回後進度不再是 100%', String(done.progress))
+  check(done.timeline.find((s) => s.key === 'disbursement')?.status === 'pending', '撥款回到未開始')
+
+  // 撤件後退回＝把案件救回來
+  let w = buildCase(makeInput(2, 'credit'), '202')
+  w = withdrawCase(w)
+  check(w.currentStage === 'withdrawn', '先撤件')
+  w = roundTrip(revertStage(w), '撤件後退回')
+  check(w.currentStage === 'credit', '撤件可退回原本那一關', w.currentStage)
+  check(w.timeline.every((s) => s.key !== 'withdrawn'), '撤件紀錄已移除')
+  check(w.timeline.filter((s) => s.status === 'current').length === 1, '救回後只有一關進行中')
+  check(advanceStage(w).currentStage === 'approval', '救回後可以繼續往下走')
+
+  // 退回不會動到備註
+  let noted = addStepNote(buildCase(makeInput(3, 'credit'), '203'), 'credit', '客戶補件中')
+  noted = revertStage(advanceStage(noted))
+  check(
+    noted.timeline.find((s) => s.key === 'credit')?.notes?.[0] === '客戶補件中',
+    '退回後備註仍在'
+  )
+}
+
+console.log('=== 12. 案件編號 1、2、3 ===')
 {
   check(!isLegacyCaseId('1') && !isLegacyCaseId('42'), '純數字為新編號')
   check(isLegacyCaseId('LN-2026-1005'), '舊格式仍可辨識')
@@ -418,7 +471,7 @@ console.log('=== 11. 案件編號 1、2、3 ===')
   check(compareCaseIdDesc('10', '9') < 0, '10 排在 9 前面（不是字串比大小）')
 }
 
-console.log('=== 12. 密碼 ===')
+console.log('=== 13. 密碼 ===')
 {
   // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
   check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))

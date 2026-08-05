@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Banknote, Briefcase, CalendarDays, Hash, Tags, User, X, XCircle, ArrowUpCircle, Trash2, Undo2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowUpCircle,
+  Banknote,
+  Briefcase,
+  CalendarDays,
+  CornerUpLeft,
+  Hash,
+  Tags,
+  Trash2,
+  Undo2,
+  User,
+  X,
+  XCircle,
+} from 'lucide-react'
 import type { LoanCase, StageKey } from '../../types'
 import { formatWan, formatDate } from '../../utils/format'
 import { describeDeletedAt, isDeleted } from '../../utils/recycleBin'
@@ -19,7 +33,9 @@ interface CaseDrawerProps {
   onUpdateRemarks: (id: string, remarks: string) => void
   onDelete: (loanCase: LoanCase) => void
   onRestore: (loanCase: LoanCase) => void
+  onRevertStage: (id: string) => void
   onChangeStepDate: (id: string, key: StageKey, date: string) => void
+  onChangeStepOfficer: (id: string, key: StageKey, officer: string) => void
   onAddStepNote: (id: string, key: StageKey, note: string) => void
   onRemoveStepNote: (id: string, key: StageKey, index: number) => void
 }
@@ -32,7 +48,9 @@ export default function CaseDrawer({
   onUpdateRemarks,
   onDelete,
   onRestore,
+  onRevertStage,
   onChangeStepDate,
+  onChangeStepOfficer,
   onAddStepNote,
   onRemoveStepNote,
 }: CaseDrawerProps) {
@@ -49,6 +67,15 @@ export default function CaseDrawer({
     loanCase && !isConcluded
       ? STAGE_CONFIG[STAGE_ORDER[STAGE_ORDER.indexOf(loanCase.currentStage) + 1]]?.label
       : null
+
+  // 撤件的案件退回到撤件前那一關；其餘退回流程上的前一關
+  const previousStage = loanCase
+    ? loanCase.currentStage === 'withdrawn'
+      ? [...loanCase.timeline].reverse().find((s) => s.status === 'completed')?.key
+      : STAGE_ORDER[STAGE_ORDER.indexOf(loanCase.currentStage) - 1]
+    : undefined
+  const canRevert = !deleted && !!previousStage
+  const revertLabel = previousStage ? STAGE_CONFIG[previousStage].label : ''
 
   const infoItems = loanCase
     ? [
@@ -155,12 +182,14 @@ export default function CaseDrawer({
 
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <h3 className="text-sm font-bold text-ink">案件流程時間軸</h3>
-                {!deleted && <span className="text-[11px] text-ink-faint">點開任一關可修改日期、加備註</span>}
+                {!deleted && <span className="text-[11px] text-ink-faint">按 ✎ 可修改日期、受理人與備註</span>}
               </div>
               <Timeline
                 steps={loanCase.timeline}
                 editable={!deleted}
+                caseOfficer={loanCase.officer}
                 onChangeDate={(key, date) => onChangeStepDate(loanCase.id, key, date)}
+                onChangeOfficer={(key, officer) => onChangeStepOfficer(loanCase.id, key, officer)}
                 onAddNote={(key, note) => onAddStepNote(loanCase.id, key, note)}
                 onRemoveNote={(key, index) => onRemoveStepNote(loanCase.id, key, index)}
               />
@@ -195,34 +224,46 @@ export default function CaseDrawer({
               </div>
             </div>
 
-            <div className="flex gap-3 border-t border-slate-100 px-6 py-4">
+            <div className="border-t border-slate-100 px-6 py-4">
               {deleted ? (
                 <button
                   onClick={() => onRestore(loanCase)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover"
                 >
                   <Undo2 size={16} />
                   復原此案件
                 </button>
               ) : (
-                <>
-              <button
-                onClick={() => onWithdraw(loanCase.id)}
-                disabled={!!isConcluded}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white py-2.5 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-ink-faint disabled:hover:bg-white"
-              >
-                <XCircle size={16} />
-                撤件
-              </button>
-              <button
-                onClick={() => onAdvanceStage(loanCase.id)}
-                disabled={!!isConcluded}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-ink-faint"
-              >
-                <ArrowUpCircle size={16} />
-                {nextStageLabel ? `更新流程至「${nextStageLabel}」` : '案件已結案'}
-              </button>
-                </>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => onAdvanceStage(loanCase.id)}
+                    disabled={!!isConcluded}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-ink-faint"
+                  >
+                    <ArrowUpCircle size={16} />
+                    {nextStageLabel ? `更新流程至「${nextStageLabel}」` : '案件已結案'}
+                  </button>
+                  <div className="flex gap-2">
+                    {/* 按錯「更新流程」時可以退回；撤件後也能用它把案件救回來 */}
+                    <button
+                      onClick={() => onRevertStage(loanCase.id)}
+                      disabled={!canRevert}
+                      title={revertLabel ? `退回上一關（${revertLabel}）` : '已在第一關，無法退回'}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-ink-soft transition-colors duration-150 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-ink-faint disabled:hover:border-slate-100 disabled:hover:text-ink-faint"
+                    >
+                      <CornerUpLeft size={16} />
+                      {revertLabel ? `退回「${revertLabel}」` : '退回上一關'}
+                    </button>
+                    <button
+                      onClick={() => onWithdraw(loanCase.id)}
+                      disabled={!!isConcluded}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white py-2.5 text-sm font-semibold text-danger transition-colors duration-150 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-ink-faint disabled:hover:bg-white"
+                    >
+                      <XCircle size={16} />
+                      撤件
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </motion.aside>
