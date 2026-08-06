@@ -24,13 +24,13 @@ import {
   EMPTY_REPORT_FILTERS,
   recentDaysRange,
   sortReportCases,
-  SORT_OPTIONS,
   type ReportFilters,
 } from '../../utils/reportFilters'
 import { getSummaryCounts } from '../../utils/metrics'
 import { formatWan } from '../../utils/format'
 import { isOverdue } from '../table/LoanTable'
 import PrintableReport from './PrintableReport'
+import SortControls from './SortControls'
 import { downloadReportPdf } from '../../utils/downloadReportPdf'
 import type { LoanCase, StageKey } from '../../types'
 
@@ -78,7 +78,6 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
     () => sortReportCases(applyReportFilters(cases, filters), filters.sortKey, filters.sortDir),
     [cases, filters]
   )
-  const sortOption = SORT_OPTIONS.find((o) => o.key === filters.sortKey) ?? SORT_OPTIONS[0]
   const activeFilterCount = countActiveFilters(filters)
   const summary = getSummaryCounts(filteredCases)
   const totalAmount = filteredCases.reduce((sum, c) => sum + c.loanAmount, 0)
@@ -145,6 +144,11 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
     } finally {
       setDownloading(false)
     }
+  }
+
+  /** 排序這類單選條件直接覆蓋，篩選頁與預覽頁共用。 */
+  function patchFilters(patch: Partial<ReportFilters>) {
+    setFilters((f) => ({ ...f, ...patch }))
   }
 
   /** 類別、貸款種類這類多選條件：點一下加入，再點一下移除。 */
@@ -426,49 +430,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold text-ink-soft">
-                        排序方式
-                        <span className="ml-1 font-normal text-ink-faint">報表與 PDF 都照這個順序印</span>
-                      </label>
-                      <div className="mb-2.5 flex flex-wrap gap-1.5">
-                        {SORT_OPTIONS.map((option) => {
-                          const active = filters.sortKey === option.key
-                          return (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => setFilters((f) => ({ ...f, sortKey: option.key }))}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
-                                active
-                                  ? 'border-primary bg-blue-50 text-primary'
-                                  : 'border-slate-200 text-ink-soft hover:border-primary hover:text-primary'
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      {/* 方向的說法會隨欄位改變：金額是「多到少」，日期是「新到舊」 */}
-                      <div className="flex gap-1.5">
-                        {(['asc', 'desc'] as const).map((dir) => {
-                          const active = filters.sortDir === dir
-                          return (
-                            <button
-                              key={dir}
-                              type="button"
-                              onClick={() => setFilters((f) => ({ ...f, sortDir: dir }))}
-                              className={`flex-1 rounded-xl py-2 text-xs font-semibold transition-colors duration-200 ${
-                                active ? 'bg-primary text-white shadow-sm' : 'bg-slate-50 text-ink-soft hover:bg-slate-100'
-                              }`}
-                            >
-                              {dir === 'asc' ? sortOption.asc : sortOption.desc}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
+                    <SortControls filters={filters} onChange={patchFilters} />
                   </div>
 
                   {/* 步驟一底部：即時顯示筆數，並前往預覽 */}
@@ -548,6 +510,11 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                           <Maximize2 size={14} />
                         </button>
                       </div>
+                    </div>
+
+                    {/* 在預覽這一頁也能直接換排序，按下去下方版面立刻重排 */}
+                    <div className="print-hide px-5 pb-2 sm:px-6">
+                      <SortControls filters={filters} onChange={patchFilters} compact />
                     </div>
 
                     {/* 等比縮放的 A4 版面；下載時仍以原始尺寸輸出 */}
