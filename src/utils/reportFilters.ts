@@ -1,6 +1,24 @@
-import { STAGE_CONFIG } from '../data/stages'
+import { ALL_FILTER_STAGES, STAGE_CONFIG } from '../data/stages'
+import { compareCaseIdDesc } from './caseId'
 import { formatDate, formatWan, wanToNt } from './format'
 import type { LoanCase, StageKey } from '../types'
+
+/** 報表可以依哪些欄位排序。 */
+export type ReportSortKey = 'id' | 'amount' | 'createdDate' | 'officer' | 'stage' | 'category' | 'loanType'
+
+/** asc＝由小到大（金額少到多、日期舊到新），desc 反之。 */
+export type SortDirection = 'asc' | 'desc'
+
+/** 排序選項與兩個方向各自的說法，讓畫面直接顯示「金額（多到少）」這種好懂的字。 */
+export const SORT_OPTIONS: { key: ReportSortKey; label: string; asc: string; desc: string }[] = [
+  { key: 'id', label: '案件編號', asc: '小到大', desc: '大到小' },
+  { key: 'amount', label: '貸款金額', asc: '少到多', desc: '多到少' },
+  { key: 'createdDate', label: '建立日期', asc: '舊到新', desc: '新到舊' },
+  { key: 'stage', label: '目前流程', asc: '前段到後段', desc: '後段到前段' },
+  { key: 'category', label: '類別', asc: '順向', desc: '反向' },
+  { key: 'loanType', label: '貸款種類', asc: '順向', desc: '反向' },
+  { key: 'officer', label: '受理人', asc: '順向', desc: '反向' },
+]
 
 export interface ReportFilters {
   /** 建立日期起（含），空字串代表不限 */
@@ -19,6 +37,10 @@ export interface ReportFilters {
   amountFromWan: string
   /** 貸款金額上限（萬），空字串代表不限 */
   amountToWan: string
+  /** 依哪個欄位排序 */
+  sortKey: ReportSortKey
+  /** 排序方向 */
+  sortDir: SortDirection
 }
 
 export const EMPTY_REPORT_FILTERS: ReportFilters = {
@@ -30,6 +52,9 @@ export const EMPTY_REPORT_FILTERS: ReportFilters = {
   loanTypes: [],
   amountFromWan: '',
   amountToWan: '',
+  // 報表預設照案件編號 1、2、3 由小到大印，翻頁時最好對照
+  sortKey: 'id',
+  sortDir: 'asc',
 }
 
 /** 最近 N 天的快速選擇，回傳可直接套用的日期區間。 */
@@ -63,6 +88,51 @@ export function applyReportFilters(cases: LoanCase[], filters: ReportFilters): L
   })
 }
 
+/**
+ * 依指定欄位排序，回傳新陣列（不更動傳入的資料）。
+ *
+ * 兩筆資料在該欄位相同時一律再照案件編號由小到大排，
+ * 這樣同樣的條件每次列印出來的順序都一致。
+ */
+export function sortReportCases(cases: LoanCase[], key: ReportSortKey, dir: SortDirection): LoanCase[] {
+  const sign = dir === 'asc' ? 1 : -1
+  // 中文字要照筆畫／注音排才符合直覺，交給瀏覽器的中文定序處理
+  const text = (a: string, b: string) => (a || '').localeCompare(b || '', 'zh-Hant')
+  // 編號由小到大＝既有「由新到舊」比較函式的反向
+  const byId = (a: LoanCase, b: LoanCase) => -compareCaseIdDesc(a.id, b.id)
+
+  const compare = (a: LoanCase, b: LoanCase): number => {
+    switch (key) {
+      case 'amount':
+        return a.loanAmount - b.loanAmount
+      case 'createdDate':
+        // ISO 日期字串可直接以字典序比較
+        return (a.createdDate || '').localeCompare(b.createdDate || '')
+      case 'stage':
+        return ALL_FILTER_STAGES.indexOf(a.currentStage) - ALL_FILTER_STAGES.indexOf(b.currentStage)
+      case 'category':
+        return text(a.category ?? '', b.category ?? '')
+      case 'loanType':
+        return text(a.loanType, b.loanType)
+      case 'officer':
+        return text(a.officer, b.officer)
+      default:
+        return byId(a, b)
+    }
+  }
+
+  return [...cases].sort((a, b) => {
+    const result = compare(a, b)
+    return result !== 0 ? sign * result : byId(a, b)
+  })
+}
+
+/** 目前排序方式的中文說明，例如「貸款金額（多到少）」。 */
+export function describeSort(filters: ReportFilters): string {
+  const option = SORT_OPTIONS.find((o) => o.key === filters.sortKey) ?? SORT_OPTIONS[0]
+  return `${option.label}（${filters.sortDir === 'asc' ? option.asc : option.desc}）`
+}
+
 /** 產生列印表頭要顯示的篩選條件說明。 */
 export function describeFilters(filters: ReportFilters): string {
   const parts: string[] = []
@@ -90,7 +160,10 @@ export function describeFilters(filters: ReportFilters): string {
     parts.push(`貸款金額：${from} ~ ${to}`)
   }
 
-  return parts.length > 0 ? parts.join('　｜　') : '篩選條件：全部案件'
+  // 排序方式一定要印出來，日後看到紙本才知道當初是照什麼順序排的
+  parts.push(`排序：${describeSort(filters)}`)
+
+  return parts.length > 1 ? parts.join('　｜　') : `篩選條件：全部案件　｜　${parts[0]}`
 }
 
 /** 目前套用了幾項條件，讓畫面上可以提示「已套用 N 項」。 */

@@ -23,8 +23,10 @@ import {
   applyReportFilters,
   countActiveFilters,
   describeFilters,
+  describeSort,
   EMPTY_REPORT_FILTERS,
   recentDaysRange,
+  sortReportCases,
 } from '../src/utils/reportFilters'
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
 import { formatWan, wanToNt, formatDate } from '../src/utils/format'
@@ -578,7 +580,123 @@ console.log('=== 14. 報表篩選：類別、種類、金額、天數 ===')
   check(described.includes('100萬') && described.includes('1,500萬'), '說明文字含金額區間', described)
 }
 
-console.log('=== 15. 密碼 ===')
+console.log('=== 15. 報表排序 ===')
+{
+  const base = (i: number, over: Partial<LoanCase>) => ({ ...buildCase(makeInput(i), String(i + 1)), ...over })
+  // 故意讓傳入順序與任何一種排序都不同，確保結果真的是排過的
+  const pool: LoanCase[] = [
+    base(2, {
+      category: '新貸',
+      loanType: '理財週轉',
+      loanAmount: wanToNt(80),
+      createdDate: '2026-01-01',
+      officer: '盧小姐',
+      currentStage: 'disbursement',
+    }),
+    base(0, {
+      category: '追加',
+      loanType: '購置自用住宅',
+      loanAmount: wanToNt(6000),
+      createdDate: '2026-08-01',
+      officer: '王先生',
+      currentStage: 'intake',
+    }),
+    base(3, {
+      category: '展期',
+      loanType: '土建融貸款',
+      loanAmount: wanToNt(1200),
+      createdDate: '2025-12-01',
+      officer: '陳先生',
+      currentStage: 'credit',
+    }),
+  ]
+  pool[0].id = '3'
+  pool[1].id = '1'
+  pool[2].id = '4'
+  const ids = (list: LoanCase[]) => list.map((c) => c.id).join(',')
+
+  // 編號
+  check(ids(sortReportCases(pool, 'id', 'asc')) === '1,3,4', '編號由小到大', ids(sortReportCases(pool, 'id', 'asc')))
+  check(ids(sortReportCases(pool, 'id', 'desc')) === '4,3,1', '編號由大到小', ids(sortReportCases(pool, 'id', 'desc')))
+  check(EMPTY_REPORT_FILTERS.sortKey === 'id' && EMPTY_REPORT_FILTERS.sortDir === 'asc', '預設照編號由小到大')
+
+  // 金額
+  const amountAsc = sortReportCases(pool, 'amount', 'asc')
+  check(amountAsc.map((c) => c.loanAmount / 10000).join(',') === '80,1200,6000', '金額由少到多')
+  check(
+    sortReportCases(pool, 'amount', 'desc')
+      .map((c) => c.loanAmount / 10000)
+      .join(',') === '6000,1200,80',
+    '金額由多到少'
+  )
+
+  // 日期
+  check(
+    sortReportCases(pool, 'createdDate', 'asc')
+      .map((c) => c.createdDate)
+      .join(',') === '2025-12-01,2026-01-01,2026-08-01',
+    '建立日期由舊到新'
+  )
+  check(sortReportCases(pool, 'createdDate', 'desc')[0].createdDate === '2026-08-01', '建立日期由新到舊')
+
+  // 流程階段照實際承作順序，不是照筆劃
+  check(
+    sortReportCases(pool, 'stage', 'asc')
+      .map((c) => c.currentStage)
+      .join(',') === 'intake,credit,disbursement',
+    '流程由前段排到後段'
+  )
+  check(sortReportCases(pool, 'stage', 'desc')[0].currentStage === 'disbursement', '流程由後段排到前段')
+
+  // 類別、種類、受理人：同一群會排在一起
+  check(new Set(sortReportCases(pool, 'category', 'asc').map((c) => c.category)).size === 3, '類別排序不漏件')
+  check(sortReportCases(pool, 'loanType', 'asc').length === pool.length, '貸款種類排序不漏件')
+  check(sortReportCases(pool, 'officer', 'desc').length === pool.length, '受理人排序不漏件')
+
+  // 同值時照編號由小到大，順序才會每次一致
+  const tied: LoanCase[] = [
+    { ...base(0, { loanAmount: wanToNt(500) }), id: '9' },
+    { ...base(0, { loanAmount: wanToNt(500) }), id: '2' },
+    { ...base(0, { loanAmount: wanToNt(500) }), id: '11' },
+  ]
+  check(ids(sortReportCases(tied, 'amount', 'asc')) === '2,9,11', '同金額時照編號由小到大', ids(sortReportCases(tied, 'amount', 'asc')))
+  check(ids(sortReportCases(tied, 'amount', 'desc')) === '2,9,11', '反向排序時同值仍照編號排')
+
+  // 不更動傳入的資料
+  const original = ids(pool)
+  sortReportCases(pool, 'amount', 'desc')
+  check(ids(pool) === original, '排序不會動到原本的陣列')
+  check(sortReportCases([], 'id', 'asc').length === 0, '沒有案件時回傳空陣列')
+
+  // 說明文字
+  check(describeSort(EMPTY_REPORT_FILTERS) === '案件編號（小到大）', '排序說明文字', describeSort(EMPTY_REPORT_FILTERS))
+  check(
+    describeSort({ ...EMPTY_REPORT_FILTERS, sortKey: 'amount', sortDir: 'desc' }) === '貸款金額（多到少）',
+    '金額的方向用「多到少」'
+  )
+  check(
+    describeSort({ ...EMPTY_REPORT_FILTERS, sortKey: 'createdDate', sortDir: 'desc' }) === '建立日期（新到舊）',
+    '日期的方向用「新到舊」'
+  )
+  check(describeFilters(EMPTY_REPORT_FILTERS).includes('排序：案件編號（小到大）'), '報表表頭會印出排序方式')
+  check(
+    describeFilters({ ...EMPTY_REPORT_FILTERS, officer: '王先生', sortKey: 'amount', sortDir: 'desc' }).includes(
+      '排序：貸款金額（多到少）'
+    ),
+    '有其他條件時也會印出排序'
+  )
+  check(countActiveFilters({ ...EMPTY_REPORT_FILTERS, sortKey: 'amount' }) === 0, '排序不算在「已套用條件」內')
+
+  // 先篩選再排序，兩者互不干擾
+  const filtered = sortReportCases(
+    applyReportFilters(pool, { ...EMPTY_REPORT_FILTERS, amountFromWan: '100' }),
+    'amount',
+    'desc'
+  )
+  check(ids(filtered) === '1,4', '篩選後再排序', ids(filtered))
+}
+
+console.log('=== 16. 密碼 ===')
 {
   // 沒設密碼＝沿用員編，先前建立的帳號驗證方式完全不變
   check(resolveSecret('A1234', '') === 'a1234', '密碼留空時沿用員編', resolveSecret('A1234', ''))
