@@ -20,7 +20,6 @@ import {
   applyReportFilters,
   countActiveFilters,
   describeFilters,
-  describeSort,
   EMPTY_REPORT_FILTERS,
   recentDaysRange,
   sortReportCases,
@@ -430,7 +429,6 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                       </div>
                     </div>
 
-                    <SortControls filters={filters} onChange={patchFilters} />
                   </div>
 
                   {/* 步驟一底部：即時顯示筆數，並前往預覽 */}
@@ -444,9 +442,6 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
                             已套用 {activeFilterCount} 項條件
                           </span>
                         )}
-                        <span className="mt-0.5 block truncate text-[11px] text-ink-faint">
-                          排序：{describeSort(filters)}
-                        </span>
                       </p>
                       <button
                         onClick={() => setFilters(EMPTY_REPORT_FILTERS)}
@@ -514,7 +509,7 @@ export default function PrintReportModal({ open, cases, onClose }: PrintReportMo
 
                     {/* 在預覽這一頁也能直接換排序，按下去下方版面立刻重排 */}
                     <div className="print-hide px-5 pb-2 sm:px-6">
-                      <SortControls filters={filters} onChange={patchFilters} compact />
+                      <SortControls filters={filters} onChange={patchFilters} />
                     </div>
 
                     {/* 等比縮放的 A4 版面；下載時仍以原始尺寸輸出 */}
