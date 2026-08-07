@@ -5,11 +5,9 @@ import { LOAN_TYPE_OPTIONS } from '../../data/loanTypes'
 import { CATEGORY_OPTIONS } from '../../data/categories'
 import { STAGE_CONFIG, STAGE_ORDER } from '../../data/stages'
 import { getTodayIso } from '../../utils/today'
-import { wanToNt } from '../../utils/format'
+import { validateAmountWan, wanToNt } from '../../utils/format'
 import type { NewCaseInput } from '../../utils/caseActions'
 import type { StageKey } from '../../types'
-
-const AMOUNT_STEP_WAN = 10
 
 interface NewCaseModalProps {
   open: boolean
@@ -35,9 +33,10 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
   const [touched, setTouched] = useState(false)
 
   const amountWan = Number(form.loanAmountWan)
+  const amountError = validateAmountWan(form.loanAmountWan)
   const errors = {
     customerName: form.customerName.trim() === '',
-    loanAmountWan: !form.loanAmountWan || !(amountWan > 0),
+    loanAmountWan: amountError !== '',
     loanType: form.loanType.trim() === '',
     category: form.category.trim() === '',
     officer: form.officer.trim() === '',
@@ -142,11 +141,16 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                     <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
                       <Banknote size={12} /> 貸款金額（萬）
                     </label>
+                    {/*
+                      金額從 0 起跳、不限定 10 的倍數，85 萬、125 萬、0.5 萬都要能填。
+                      這裡刻意不設 min/step：交給程式自己檢查並顯示中文訊息，
+                      不然瀏覽器會直接擋下送出、只跳一句英文，看起來像按鈕壞掉。
+                    */}
                     <div className="relative">
                       <input
                         type="number"
-                        min="0"
-                        step={AMOUNT_STEP_WAN}
+                        step="any"
+                        inputMode="decimal"
                         value={form.loanAmountWan}
                         onChange={(e) => setForm((f) => ({ ...f, loanAmountWan: e.target.value }))}
                         placeholder="例如：500"
@@ -156,7 +160,7 @@ export default function NewCaseModal({ open, onClose, onCreate }: NewCaseModalPr
                         萬
                       </span>
                     </div>
-                    {touched && errors.loanAmountWan && <p className="mt-1 text-xs text-danger">請輸入有效金額</p>}
+                    {touched && errors.loanAmountWan && <p className="mt-1 text-xs text-danger">{amountError}</p>}
                   </div>
 
                   <div>

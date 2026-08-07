@@ -29,7 +29,7 @@ import {
   sortReportCases,
 } from '../src/utils/reportFilters'
 import { getSummaryCounts, getManagerMetrics, getDailyCompletionSeries, getMonthlyNewCaseSeries } from '../src/utils/metrics'
-import { formatWan, wanToNt, formatDate } from '../src/utils/format'
+import { formatWan, wanToNt, formatDate, validateAmountWan } from '../src/utils/format'
 import { describeDeletedAt, isDeleted, partitionCases } from '../src/utils/recycleBin'
 import { compareCaseIdDesc, isLegacyCaseId } from '../src/utils/caseId'
 import { needsRenumber, planRenumber } from '../src/utils/renumberCases'
@@ -270,6 +270,23 @@ check(
   ALL_FILTER_STAGES.every((s) => !!STAGE_CONFIG[s]?.label && !!STAGE_CONFIG[s]?.color),
   '每個階段都有名稱與顏色'
 )
+
+// 貸款金額：0 起跳，任何數字都能填
+check(validateAmountWan('500') === '', '整數金額可用', validateAmountWan('500'))
+check(validateAmountWan('555') === '', '不是 10 的倍數也可用', validateAmountWan('555'))
+check(validateAmountWan('125') === '', '125 萬可用', validateAmountWan('125'))
+check(validateAmountWan('1') === '', '1 萬可用', validateAmountWan('1'))
+check(validateAmountWan('0.5') === '', '小數可用（0.5 萬＝5 千）', validateAmountWan('0.5'))
+check(validateAmountWan('0') === '', '0 可用', validateAmountWan('0'))
+check(validateAmountWan(' 320 ') === '', '前後空白不影響', validateAmountWan(' 320 '))
+check(validateAmountWan('') !== '', '沒填要提醒')
+check(validateAmountWan('   ') !== '', '只打空白要提醒')
+check(validateAmountWan('-5') !== '', '負數要擋下')
+check(validateAmountWan('abc') !== '', '不是數字要擋下')
+check(/[一-龥]/.test(validateAmountWan('')), '錯誤訊息是中文', validateAmountWan(''))
+check(wanToNt(0.5) === 5000, '0.5 萬換算為 5,000 元', String(wanToNt(0.5)))
+check(wanToNt(125) === 1_250_000, '125 萬換算正確', String(wanToNt(125)))
+check(formatWan(wanToNt(555)) === '555萬', '555 萬顯示正確', formatWan(wanToNt(555)))
 
 console.log('=== 7. 刪除與復原（回收桶）===')
 {
