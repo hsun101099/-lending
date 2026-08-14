@@ -19,6 +19,7 @@ import {
   type NewCaseInput,
 } from '../src/utils/caseActions'
 import { normalizeCase } from '../src/utils/normalizeCase'
+import { getTodayIso } from '../src/utils/today'
 import {
   applyReportFilters,
   countActiveFilters,
@@ -386,6 +387,63 @@ console.log('=== 9. 補登舊案件：每一關可自己填日期 ===')
   const cleared = updateTimelineStep(fixed, 'appraisal', { completedDate: '' })
   check(cleared.timeline.find((s) => s.key === 'appraisal')?.completedDate === undefined, '清空日期不會留下空字串')
   check(findUndefinedPaths(cleared).length === 0, '修改日期後可安全寫入 Firestore')
+
+  // 先改日期再按「更新流程」：要沿用自己填的日期，不能被改成今天
+  const today = getTodayIso()
+  {
+    let c = buildCase(makeInput(0, 'approval'), '81')
+    c = updateTimelineStep(c, 'approval', { completedDate: '2026-08-13' })
+    check(c.timeline.find((s) => s.key === 'approval')?.completedDate === '2026-08-13', '進行中的關卡也能先填日期')
+
+    c = advanceStage(c)
+    const approval = c.timeline.find((s) => s.key === 'approval')
+    check(approval?.status === 'completed', '按更新後該關成為已完成')
+    check(approval?.completedDate === '2026-08-13', '按更新後沿用自己填的日期', approval?.completedDate)
+    check(c.currentStage === 'headOffice', '確實推進到下一關')
+    check(c.timeline.find((s) => s.key === 'headOffice')?.completedDate === undefined, '新的進行中關卡還沒有日期')
+    check(c.lastUpdated === today, '最後異動日仍記為今天', c.lastUpdated)
+    check(findUndefinedPaths(c).length === 0, '沿用日期後可安全寫入 Firestore')
+  }
+
+  // 沒有自己填日期時，維持原本行為：填今天
+  {
+    let c = buildCase(makeInput(0, 'approval'), '82')
+    c = advanceStage(c)
+    check(
+      c.timeline.find((s) => s.key === 'approval')?.completedDate === today,
+      '沒填日期時仍自動填今天',
+      c.timeline.find((s) => s.key === 'approval')?.completedDate
+    )
+  }
+
+  // 最後一關（撥款）同樣沿用先填好的日期
+  {
+    let c = buildCase(makeInput(0, 'finalApproval'), '83')
+    c = updateTimelineStep(c, 'disbursement', { completedDate: '2026-08-13' })
+    c = advanceStage(c)
+    check(c.currentStage === 'disbursement', '推進到撥款')
+    check(
+      c.timeline.find((s) => s.key === 'disbursement')?.completedDate === '2026-08-13',
+      '撥款日期沿用先填好的',
+      c.timeline.find((s) => s.key === 'disbursement')?.completedDate
+    )
+  }
+
+  // 退回時日期會清掉，再按更新就回到「填今天」
+  {
+    let c = buildCase(makeInput(0, 'approval'), '84')
+    c = updateTimelineStep(c, 'approval', { completedDate: '2026-08-13' })
+    c = advanceStage(c)
+    c = revertStage(c)
+    check(c.currentStage === 'approval', '退回單位批示')
+    check(c.timeline.find((s) => s.key === 'approval')?.completedDate === undefined, '退回會清掉日期')
+    c = advanceStage(c)
+    check(
+      c.timeline.find((s) => s.key === 'approval')?.completedDate === today,
+      '退回後再更新填今天',
+      c.timeline.find((s) => s.key === 'approval')?.completedDate
+    )
+  }
 }
 
 console.log('=== 10. 流程備註：可累加、可個別刪除 ===')

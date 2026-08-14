@@ -90,14 +90,15 @@ export function advanceStage(loanCase: LoanCase): LoanCase {
 
   const timeline = loanCase.timeline.map((step, i) => {
     if (i === idx) {
-      return { ...step, status: 'completed' as const, completedDate: today }
+      // 使用者可能已經先把這一關的日期改成實際完成日，這時就沿用他填的，不要蓋成今天
+      return { ...step, status: 'completed' as const, completedDate: step.completedDate ?? today }
     }
     if (i === idx + 1) {
       return reachesFinalStage
         ? {
             ...step,
             status: 'completed' as const,
-            completedDate: today,
+            completedDate: step.completedDate ?? today,
             officer: step.officer ?? loanCase.officer,
             description: `${STAGE_CONFIG[nextStage].label}作業已完成，資料已歸檔存查。`,
           }
